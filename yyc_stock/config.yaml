@@ -1,0 +1,180 @@
+
+LANGSMITH:
+    API_KEYS: 
+        - ${LANGSMITH_API_KEYS}
+        - ${LANGSMITH_API_KEY}
+LLM:
+    DEFAULT: "LLM.FREE"
+    SILICONFLOW:
+        API_KEYS: 
+            - ${SILICONFLOW_API_KEYS}
+            - ${SILICONFLOW_API_KEY}
+        BASE_URL: https://api.siliconflow.cn/v1
+        MODEL: ${SILICONFLOW_LLM_MODEL}
+    TOGETHER: 
+        API_KEYS: 
+            - ${TOGETHER_API_KEYS}
+            - ${TOGETHER_API_KEY}
+        BASE_URL: https://api.together.xyz/v1
+        MODEL: ${TOGETHER_LLM_MODEL}
+    GROQ:
+        API_KEYS: 
+            - ${GROQ_API_KEYS}
+            - ${GROQ_API_KEY}
+        BASE_URL: https://api.groq.com/openai/v1
+        MODEL: ${GROQ_LLM_MODEL}
+    GEMINI:
+        API_KEYS: 
+            - ${GEMINI_API_KEYS}
+            - ${GEMINI_API_KEY}
+        MODEL: ${GEMINI_LLM_MODEL}
+    DEEPSEEK:
+        API_KEYS: 
+            - ${DEEPSEEK_API_KEYS}
+            - ${DEEPSEEK_API_KEY}
+        BASE_URL: https://api.deepseek.com/v1
+        MODEL: ${DEEPSEEK_LLM_MODEL}
+    QIANFAN:
+        API_KEYS: ${QIANFAN_API_KEYS}
+        SEC_KEYS: ${QIANFAN_SEC_KEYS}
+        MODEL: ${QIANFAN_LLM_MODEL}
+    OLLAMA:
+        API_KEYS: 
+            - ${OLLAMA_API_KEYS}
+            - ${OLLAMA_API_KEY}
+        BASE_URL: ${OLLAMA_BASE_URL}    
+        MODEL: ${OLLAMA_LLM_MODEL}
+        KEEP_ALIVE: -1
+    MOONSHOT:
+        API_KEYS: 
+            - ${MOONSHOT_API_KEYS}
+            - ${MOONSHOT_API_KEY}
+        BASE_URL: https://api.moonshot.cn/v1
+        MODEL: ${MOONSHOT_LLM_MODEL}  
+    DEEPBRICKS:
+        API_KEYS: 
+            - ${DEEPBRICKS_API_KEYS}
+            - ${DEEPBRICKS_API_KEY}
+        BASE_URL: https://api.deepbricks.ai/v1
+        MODEL: ${DEEPBRICKS_LLM_MODEL}
+    HF:
+        API_KEYS: 
+            - ${HF_API_KEYS}
+            - ${HF_API_KEY}
+        MODEL: ${HF_LLM_MODEL}
+        PIPELINE: false
+    DASHSCOPE:
+        API_KEYS: 
+            - ${DASHSCOPE_API_KEYS}
+            - ${DASHSCOPE_API_KEY}
+        BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+        MODEL: ${DASHSCOPE_LLM_MODEL}
+    ZHIPU:
+        API_KEYS: 
+            - ${ZHIPU_API_KEYS}
+            - ${ZHIPU_API_KEY}
+        BASE_URL: https://open.bigmodel.cn/api/paas/v4
+        MODEL: ${ZHIPU_LLM_MODEL}
+    FREE:
+        API_KEYS:
+            - ${FREE_API_KEYS}
+            - ${FREE_API_KEY}
+        BASE_URL: https://api.chatanywhere.tech
+        MODEL: ${FREE_LLM_MODEL}
+    X:
+        API_KEYS:
+            - ${X_API_KEYS}
+            - ${X_API_KEY}
+        BASE_URL: https://api.x.ai/v1
+        MODEL: ${X_LLM_MODEL}
+
+EMBEDDING:
+    DEFAULT: EMBEDDING.FREE
+    TOGETHER: 
+        API_KEYS: 
+            - ${TOGETHER_API_KEYS}
+            - ${TOGETHER_API_KEY}
+        MODEL: ${TOGETHER_EMBEDDING_MODEL}
+    GEMINI:
+        API_KEYS: 
+            - ${GEMINI_API_KEYS}
+            - ${GEMINI_API_KEY}
+        MODEL: ${GEMINI_EMBEDDING_MODEL}
+    OLLAMA:
+        API_KEYS: 
+            - ${OLLAMA_API_KEYS}
+            - ${OLLAMA_API_KEY}
+        BASE_URL: ${OLLAMA_BASE_URL}
+        MODEL: ${OLLAMA_EMBEDDING_MODEL}
+    HF:
+        API_KEYS: 
+            - ${HF_API_KEYS}
+            - ${HF_API_KEY}
+        MODEL: ${HF_EMBEDDING_MODEL}
+        PIPELINE: false
+    DASHSCOPE:
+        API_KEYS: 
+            - ${DASHSCOPE_API_KEYS}
+            - ${DASHSCOPE_API_KEY}
+        MODEL: ${DASHSCOPE_EMBEDDING_MODEL}
+    FREE:
+        API_KEYS: 
+            - ${FREE_API_KEYS}
+            - ${FREE_API_KEY}
+        MODEL: ${FREE_EMBEDDING_MODEL}
+TTS:
+    DASHSCOPE:
+        API_KEYS: 
+            - ${DASHSCOPE_API_KEYS}
+            - ${DASHSCOPE_API_KEY}
+        MODEL: ${DASHSCOPE_TTS_MODEL}
+FLUX:
+    DASHSCOPE:
+        API_KEYS: 
+            - ${DASHSCOPE_API_KEYS}
+            - ${DASHSCOPE_API_KEY}
+        MODEL: ${DASHSCOPE_FLUX_MODEL}
+
+SEARCH_TOOLS:
+    TAVILY:
+        API_KEYS: 
+            - ${TAVILY_API_KEYS}
+            - ${TAVILY_API_KEY}
+    SERPAPI:
+        API_KEYS: 
+            - ${SERPAPI_API_KEYS}
+            - ${SERPAPI_API_KEY}
+DATABASE:
+    ES:
+        HOST: ${ES_HOST}
+        USER: elastic
+        PASSWORD: ${ES_PASSWORD}
+
+VECTORSTORE:
+    DEFAULT: chroma
+    FAISS:
+        DB_FILE: rag.faiss
+    ES:
+        HOST: ${ES_HOST}
+        USER: elastic
+        PASSWORD: ${ES_PASSWORD}
+    CHROMA:
+        SERVER: false
+        HOST: ${CHROMA_HOST}
+        PORT: 8089
+        DB_FILE: rag.chroma
+NEO4J:
+    #HOST: neo4j+s://f0ada9b2.databases.neo4j.io
+    #HOST: bolt://localhost:7687
+    #HOST: bolt://neo4j:7687 
+    HOST: ${NEO4J_HOST}
+    USER: neo4j
+    PASSWORD: ${NEO4J_PASSWORD}
+
+STOCK:
+    SNOWBALL:
+        TOKEN: ${SNOWBALL_TOKEN}
+    TUSHARE:
+        TOKEN: ${TUSHARE_TOKEN}
+    MAIRUI:
+        TOKEN: ${MAIRUI_TOKEN}
