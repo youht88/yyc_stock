@@ -6301,13 +6301,13 @@ reference = "tsinghua"
 
 [[package]]
 name = "ylz-utils"
-version = "0.3.24"
+version = "0.3.25"
 description = "ylz 工具类"
 optional = false
 python-versions = ">=3.13,<4.0"
 files = [
-    {file = "ylz_utils-0.3.24-py3-none-any.whl", hash = "sha256:fceac4dbec83954763f07ebb19ab207e445eca4d3c9ade4349f241830f4ea622"},
-    {file = "ylz_utils-0.3.24.tar.gz", hash = "sha256:72ee54e4fb3f2a936cf19ab26625cffc5f569aa1c0c349e5946b4617fd069432"},
+    {file = "ylz_utils-0.3.25-py3-none-any.whl", hash = "sha256:593bacb88c519d7f9d602c9e95f0d86182767213e79a0d41af084802e20765d4"},
+    {file = "ylz_utils-0.3.25.tar.gz", hash = "sha256:e433b6923f4b54ad3b52e400933c6323b31b27bf822792e931f2dcb80a25ef0b"},
 ]
 
 [package.dependencies]
@@ -6352,7 +6352,6 @@ pdfplumber = ">=0.11.2,<0.12.0"
 pillow-heif = ">=0.18.0,<0.19.0"
 playwright = ">=1.45.1,<2.0.0"
 pydantic-core = ">=2.20.1,<3.0.0"
-pysnowball = ">=0.1.3,<0.2.0"
 python-docx = ">=1.1.2,<2.0.0"
 python-dotenv = ">=1.0.1,<2.0.0"
 python-pptx = ">=0.6.23,<0.7.0"
@@ -6365,7 +6364,6 @@ sqlite4 = ">=0.1.1,<0.2.0"
 sse-starlette = ">=2.1.2,<3.0.0"
 tabulate = ">=0.9.0,<0.10.0"
 trustcall = ">=0.0.22,<0.0.23"
-tushare = ">=1.4.13,<2.0.0"
 typing-extensions = ">=4.12.2,<5.0.0"
 websockets = "11.0"
 wolframalpha = ">=5.1.3,<6.0.0"
@@ -6418,4 +6416,4 @@ reference = "tsinghua"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.13"
-content-hash = "1389d8af8524d7ca9575c1347372c69e4b801c468614daecb3486fb609a14b71"
+content-hash = "998eddb622f5dab48fcb4b89d0e4af0fd415c032cd87d9bdac9c035afccf7b24"

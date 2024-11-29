@@ -4,7 +4,7 @@ import requests
 import tushare
 
 from ylz_utils.config import Config
-from ylz_utils.stock.base import StockBase
+from yyc_stock.stock.base import StockBase
 
 class TushareStock(StockBase):
     def __init__(self):

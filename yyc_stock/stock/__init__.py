@@ -5,10 +5,10 @@ from ylz_utils.loger import LoggerLib
 from fastapi import FastAPI, HTTPException
 import fastapi_cdn_host
 
-from ylz_utils.stock.akshare import AkshareStock
-from ylz_utils.stock.snowball import *
-from ylz_utils.stock.mairui import *
-from ylz_utils.stock.base import *
+from yyc_stock.stock.akshare import AkshareStock
+from yyc_stock.stock.snowball import *
+from yyc_stock.stock.mairui import *
+from yyc_stock.stock.base import *
 class StockLib():    
     def __init__(self):
         self.base = StockBase()

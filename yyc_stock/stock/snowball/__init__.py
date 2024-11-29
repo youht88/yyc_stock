@@ -1,5 +1,5 @@
 from fastapi import FastAPI
 
-from ylz_utils.stock.snowball.snowball import SnowballStock
+from yyc_stock.stock.snowball.snowball import SnowballStock
 
 

@@ -9,7 +9,7 @@ import requests
 from tqdm import tqdm
 
 from ylz_utils.config import Config
-from ylz_utils.stock.base import StockBase
+from yyc_stock.stock.base import StockBase
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger

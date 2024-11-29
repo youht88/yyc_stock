@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 import pandas as pd
 import requests
 import sqlite3
-from ylz_utils.stock.base import StockBase
+from yyc_stock.stock.base import StockBase
 
 class MairuiBase(StockBase):
     def __init__(self):

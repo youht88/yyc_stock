@@ -7,7 +7,7 @@ import requests
 import akshare as ak
 
 from ylz_utils.config import Config
-from ylz_utils.stock.base import StockBase
+from yyc_stock.stock.base import StockBase
 from datetime import datetime,timedelta
 from tqdm import tqdm
 import numpy as np
@@ -136,16 +136,23 @@ class AkshareStock(StockBase):
         return error_code_info
     def price(self):
         price_db=sqlite3.connect("price.db")
+        jhjj_db=sqlite3.connect("jhjj.db")
         table = "price"
         codes_info = self._get_bk_codes("hs_a")
         #codes_info = codes_info[:10]
         #codes_info=[{'dm':'300159','mc':'新研股份','jys':'sz'}]
         print("total codes:",len(codes_info))
-        error_msg=""
+        price_error_msg=""
+        jhjj_error_msg=""
         try:
             price_db.execute(f"select * from {table} limit 1")
         except Exception as e:
-            error_msg="no_such_table"
+            price_error_msg="no_price_db"
+        try:
+            jhjj_db.execute(f"select * from {table} limit 1")
+        except Exception as e:
+            jhjj_error_msg="no_jhjj_db"
+
         with tqdm(total=len(codes_info),desc="进度") as pbar:
             error_code_info=[]
             date = datetime.today().strftime("%Y-%m-%d")
@@ -157,21 +164,40 @@ class AkshareStock(StockBase):
                     #df=ak.stock_zh_a_tick_tx_js(code)
                     if not df.empty:
                         df=df.rename(columns={'时间':'t','成交价':'p','手数':'v','买卖盘性质':'xz'})
-                        df['e']=df.p*df.v*100
-                        df['tt']=df['t'].apply(lambda x:'0' if x<'09:25:00' else '1' if x<'10:30:00' else '2' if x<'11:30:00' else '3' if x<'14:00:00' else '4')
-                        df['vt'] = df['e'].apply(lambda x:'cdd' if x>=1000000 else 'dd' if x>=200000 else 'zd' if x>=40000 else 'xd')
-                        df['cnt']=1
-                        df1 = df.groupby(['xz','tt','p','vt'])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
-                        df1['code']=code
-                        df1['date']=date
-                        df1['mc']=mc
-                        if error_msg=="no_such_table":
-                            error_msg=""
+                        
+                        df['tt']=df['t'].apply(lambda x:0 if x<'09:25:00' else 1 if x<'10:30:00' else 2 if x<'11:30:00' else 3 if x<'14:00:00' else 4)
+                        df_jhjj = df[df.tt==0].copy()
+                        df_jhjj['v0']=df_jhjj.groupby(['p']).v.diff().fillna(df_jhjj.v)
+                        df_jhjj['e']=df_jhjj.p*df_jhjj.v0*100
+                        df_jhjj['vt'] = df_jhjj['e'].apply(lambda x:'cdd' if abs(x)>=1000000 else 'dd' if abs(x)>=200000 else 'zd' if abs(x)>=40000 else 'xd')
+                        df_jhjj['cnt']=1
+                        df_jhjj = df_jhjj.groupby(['p','vt'])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+                        df_jhjj['code']=code
+                        df_jhjj['date']=date
+                        df_jhjj['mc']=mc
+                        if jhjj_error_msg=="no_jhjj_db":
+                            jhjj_error_msg=""
+                            print("no such table [jhjj]")
+                            df_jhjj.to_sql("price",if_exists="replace",index=False,con=jhjj_db)
+                            jhjj_db.execute("create unique index index_price on price(code,date,p,vt)")
+                        else:
+                            df_jhjj.to_sql("price",if_exists="append",index=False,con=jhjj_db)
+                        
+                        df_price = df[df.tt>0].copy()
+                        df_price['e']=df_price.p*df_price.v*100
+                        df_price['vt'] = df_price['e'].apply(lambda x:'cdd' if x>=1000000 else 'dd' if x>=200000 else 'zd' if x>=40000 else 'xd')
+                        df_price['cnt']=1
+                        df_price = df_price.groupby(['xz','tt','p','vt'])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+                        df_price['code']=code
+                        df_price['date']=date
+                        df_price['mc']=mc
+                        if price_error_msg=="no_price_db":
+                            price_error_msg=""
                             print("no such table [price]")
-                            df1.to_sql("price",if_exists="replace",index=False,con=price_db)
+                            df_price.to_sql("price",if_exists="replace",index=False,con=price_db)
                             price_db.execute("create unique index index_price on price(code,date,xz,tt,p,vt)")
                         else:
-                            df1.to_sql("price",if_exists="append",index=False,con=price_db)
+                            df_price.to_sql("price",if_exists="append",index=False,con=price_db)
                     else:
                         print(f"no data on {code}-{mc}")
                 except Exception as e:
@@ -180,38 +206,176 @@ class AkshareStock(StockBase):
         return error_code_info
     def minute_pro(self):
         minute_pro_db=sqlite3.connect("minute_pro.db")
-        table = "minute"
         codes_info = self._get_bk_codes("hs_a")
-        #codes_info = codes_info[:100]
+        codes_info = codes_info[:100]
         #codes_info=[{'dm':'300159','mc':'新研股份'}]
         print("total codes:",len(codes_info))
         with tqdm(total=len(codes_info),desc="进度") as pbar:
             error_code_info=[]
             error_msg=""
-            stime = '2022-01-01 00:00:00'
+            sdate = '2024-01-01'
+            period=15
             for code_info in codes_info:
                 code = code_info['dm']
                 mc = code_info['mc']
-                new_stime = stime
-                max_time=None
+                new_sdate = sdate
+                max_date=None
                 try:
-                    max_time=minute_pro_db.execute(f"select max_d from info where code='{code}'").fetchall()
-                    if max_time:
-                        max_time = max_time[0][0]
-                        d_max_time = datetime.strptime(max_time,"%Y-%m-%d %H:%M:%S") 
-                        d_start_time = datetime.strptime(s_time,"%Y-%m-%d %H:%M:%S")
-                        if d_max_time >= d_start_time:
-                            new_stime = datetime.strftime(d_max_time + timedelta(minutes=-150),"%Y-%m-%d %H:%M:%S")
+                    max_date=minute_pro_db.execute(f"select max_d from info where code='{code}'").fetchall()
+                    if max_date:
+                        max_date = max_date[0][0]
+                        d_max_date = datetime.strptime(max_date,"%Y-%m-%d") 
+                        d_start_date = datetime.strptime(sdate,"%Y-%m-%d")
+                        if d_max_date >= d_start_date:
+                            new_sdate = datetime.strftime(d_max_date + timedelta(days=-30),"%Y-%m-%d")
                     else:
-                        print("no_info_record-->",code,mc,"max_time=",max_time,"stime=",stime)
+                        print("no_info_record-->",code,mc,"max_date=",max_date,"sdate=",sdate)
                         error_msg = "no_info_table"
                 except Exception as e:
-                    print("no_minute_table-->",code,mc,"max_time=",max_time,"stime=",stime,"error=",e)
+                    print("no_minute_table-->",code,mc,"max_date=",max_date,"sdate=",sdate,"error=",e)
                     error_msg="no_minute_table"
                 try:
-                    origin_df = pd.read_sql(f"select * from {table} where code='{code}' and d >= '{new_sdate}'",daily_db)
-                except:
-                    pass    
+                    if max_date and max_date >= datetime.today().strftime("%Y-%m-%d"):
+                        print(f"{code}-{mc},no deed because of data exists!")
+                        pbar.update(1)
+                        continue 
+                    origin_df = ak.stock_zh_a_hist_min_em(code,start_date=new_sdate,period=15)
+                    if origin_df.empty:
+                        print(f"{code}-{mc} > new_sdate={new_sdate},没有找到该数据!")
+                        pbar.update(1)
+                        continue
+                    origin_df['code']=code
+                    origin_df['mc']=mc 
+                    origin_df = origin_df.rename(columns={"时间":"t","开盘":"o","收盘":"c","最高":"h","最低":"l",
+                                                          "涨跌幅":"zd","涨跌额":"zde","成交量":"v","成交额":"e","振幅":"zf","换手率":"hs"})
+                    df = origin_df.copy().reset_index() 
+                    df_add_cols={}
+                    # 后15个周期涨跌幅
+                    for col in ['zd']:
+                        for idx in range(period):
+                            t=idx+1
+                            df_add_cols[f'p{col}_{t}']=df[col].shift(-t)
+                    # kdj指标
+                    _kdj_df = self._kdj(df.c,df.l,df.h,9,3,3)
+                    df_add_cols['kl'] = _kdj_df.kl
+                    df_add_cols['dl'] = _kdj_df.dl
+                    df_add_cols['jl'] = _kdj_df.jl
+                    # macd指标
+                    _macd_df = self._macd(df.c,12,26,9)
+                    df_add_cols['dif'] = _macd_df.dif
+                    df_add_cols['dea'] = _macd_df.dea
+                    df_add_cols['macd'] = _macd_df.macd
+                    # 当日股价高低位置
+                    status_df= pd.Series(['N']*len(df))
+                    high=df['c'].rolling(window=120).apply(lambda x:x.quantile(0.9))
+                    low=df['c'].rolling(window=120).apply(lambda x:x.quantile(0.1))
+                    status_df.loc[df['c'] > high] = 'H'
+                    status_df.loc[df['c'] < low] = 'L'
+                    df_add_cols['c_status'] = status_df
+                    # 当日交易量缩放情况
+                    status_df= pd.Series(['N']*len(df))
+                    high=df['v'].rolling(window=120).apply(lambda x:x.mean() + x.std()*2)
+                    low=df['v'].rolling(window=120).apply(lambda x:x.mean() - x.std()*2)
+                    status_df.loc[df['v'] > high] = 'U'
+                    status_df.loc[df['v'] < low] = 'D'
+                    df_add_cols['v_status'] = status_df
+                                        
+                    # 近5,10,20,60,120交易日平均关键指标                    
+                    for col in ['c','v','e','hs','zf']:
+                        for idx in [5,10,20,40,60,120]:
+                            df_add_cols[f'ma{idx}{col}']=df[col].rolling(window=idx).apply(lambda x:x.mean())        
+                    
+                    # 近5,10,20,60,120交易日累计交易量、交易额
+                    for col in ['v','e']:
+                        for idx in [5,10,20,40,60,120]:
+                            df_add_cols[f'sum{idx}{col}']=df[col].rolling(window=idx).apply(lambda x:x.sum())        
+
+                    # 近5,10,20,60,120交易日期间涨幅
+                    #for col in ['zd']:
+                    #    for idx in [4,9,19,59]:
+                    #    df_add_cols[f'prod{idx+1}{col}']=df[col].rolling(window=idx).apply(lambda x:((1+x/100).prod()-1)*100)        
+                    for col in ['c']:    
+                        for idx in [4,9,19,39,59,119]:
+                            #df_add_cols[f'prod{idx+1}{col}'] = (df[col] - df.shift(idx)[col]) / df.shift(idx)[col] * 100   
+                            df_add_cols[f'pct{idx+1}{col}'] = df[col].pct_change(idx) * 100 
+                    
+                    # 前15天关键指标          
+                    for col in ['o','c','h','l','zd','v','e','hs','zf']:
+                        for idx in range(period):
+                            t=idx+1
+                            df_add_cols[f'{col}{t}']=df[col].shift(t)
+                    #
+                    df_cols = pd.concat(list(df_add_cols.values()), axis=1, keys=list(df_add_cols.keys()))
+                    df = pd.concat([origin_df,df_cols],axis=1)
+                    # 之前的kdj、macd
+                    fields={'kl','dl','jl','dif','dea','macd'}
+                    for key in fields:
+                        df[f"{key}1"]=df[f"{key}"].shift(1)
+                        df[f"{key}2"]=df[f"{key}"].shift(2)
+                    # 连续上涨、下跌天数,正负数表示
+                    # 连续缩放量天数,正负数表示
+                    # 连续涨跌停天数,正负数表示
+                    fields={'lxzd':'c','lxsf':'v','lxzdt':'zd'}
+                    for key in fields:
+                        df[key] = 0
+                        for i in range(len(df)):
+                            count = 0
+                            for j in range(period-1):
+                                j_str = '' if j==0 else str(j)
+                                if key=='lxzdt':
+                                    if df.loc[i, f"{fields[key]}{j_str}"] > 9.9:
+                                        count += 1
+                                    else:
+                                        break
+                                else:
+                                    if df.loc[i, f"{fields[key]}{j_str}"] > df.loc[i, f"{fields[key]}{j+1}"]:
+                                        count += 1
+                                    else:
+                                        break
+                            if count==0:
+                                for j in range(period-1):
+                                    j_str = '' if j==0 else str(j)
+                                    if key=='lxzdt':
+                                        if df.loc[i, f"{fields[key]}{j_str}"] < -9.9:
+                                            count += 1
+                                        else:
+                                            break
+                                    else:
+                                        if df.loc[i, f"{fields[key]}{j_str}"] <= df.loc[i, f"{fields[key]}{j+1}"]:
+                                            count += 1
+                                        else:
+                                            break
+                                count = count*-1 
+                            df.at[i, key] = count
+                
+                    if max_date:
+                        new_sdate = datetime.strftime(d_max_date + timedelta(days=1),"%Y-%m-%d")
+                        df = df[df['t']>=new_sdate]
+                    
+                    info_max_date = df.iloc[-1]['t'][:10]
+                    if error_msg=="no_minute_table":
+                        error_msg=""
+                        print("create minute & info table ->",code,info_max_date)
+                        minute_pro_db.execute("create table info(code TEXT,max_d TEXT)")
+                        minute_pro_db.execute("create unique index info_index on info(code)")
+                        minute_pro_db.execute(f"insert into info values('{code}','{info_max_date}')")
+                        df.to_sql("minute",if_exists="replace",index=False,con=minute_pro_db)
+                        minute_pro_db.execute("create unique index minute_index on minute(code,t)")
+                    elif error_msg=="no_info_table":
+                        error_msg=""
+                        print("insert info ->",code,info_max_date)
+                        minute_pro_db.execute(f"insert into info values('{code}','{info_max_date}')")
+                        minute_pro_db.commit()
+                        df.to_sql("minute",if_exists="append",index=False,con=minute_pro_db)                        
+                    else:
+                        print("update info ->",code,info_max_date)
+                        minute_pro_db.execute(f"update info set max_d = '{info_max_date}' where code = '{code}'")
+                        minute_pro_db.commit()
+                        df.to_sql("minute",if_exists="append",index=False,con=minute_pro_db)
+                except Exception as e:
+                    error_code_info.append(f"{code}-{mc},{e}")
+                pbar.update(1)         
+        return error_code_info   
     def daily_pro(self):
         daily_db=sqlite3.connect("daily.db")
         daily_pro_db=sqlite3.connect("daily_pro.db")
@@ -498,6 +662,28 @@ class AkshareStock(StockBase):
                         'prod5c','prod10c','prod20c','sum5v','sum10v','sum20v',
                         ])
         return df
+    def fx4(self,codes=[],sdate=None,kwarg={}):
+        minute_pro_db = sqlite3.connect("minute_pro.db")
+        codes_str = ",".join([f"'{code}'" for code in codes])
+        cond = []
+        if sdate:
+            cond.append(f"t > '{sdate}'")
+        #cond.append(f"abs(kl - dl) < 1 and kl > kl1 and kl1 > kl2 and dif>0 and dea>0 and macd > macd1 and macd1 < macd2 and macd<0 and macd1<0 and macd2<0") 
+        #cond.append(f"(abs(macd1)-abs(macd))/abs(macd)>0.5 and abs(macd1) > abs(macd2) and macd<0 and macd1<0 and macd2<0 and c>h1 and v>v1") 
+        #cond.append(f"hs>3 and hs1>3 and hs2>3 and hs<5 and hs1<5 and hs2<5")
+        cond_str = ' and '.join(cond)
+        if cond_str:
+            cond_str = ' and ' + cond_str
+        print(cond_str)     
+        df = pd.read_sql(f"select * from minute where code in ({codes_str}) {cond_str}",minute_pro_db)
+        df = df.filter(['t','code','mc','o','c','h','l','v','e','zf','zd','hs',
+                        'pzd_1','pzd_2','pzd_3','pzd_4','pzd_5',
+                        'c_status','v_status','lxzd','lxsf',
+                        'lxzdt','kl','kl1','kl2','dl','dl1','dl2','dif','dea','macd','macd1','macd2',
+                        'ma20c','ma40c',
+                        'prod5c','prod10c','prod20c','sum5v','sum10v','sum20v',
+                        ])
+        return df
 
     def register_router(self):
         @self.router.get("/daily/refresh")
@@ -516,6 +702,11 @@ class AkshareStock(StockBase):
             """更新日线增强数据"""
             error_code_info=self.daily_pro()
             return {"message":f"daily_pro已完成,error_code_info={error_code_info}"}
+        @self.router.get("/minute/pro")
+        async def minute_pro(req:Request):
+            """更新15分钟增强数据"""
+            error_code_info=self.minute_pro()
+            return {"message":f"minute_pro已完成,error_code_info={error_code_info}"}
         @self.router.get("/price")
         async def price(req:Request):
             """更新价格数据"""
@@ -617,6 +808,20 @@ class AkshareStock(StockBase):
                 else:
                     lxzd=None
                 df = self.fx3(codes,sdate,{'lxzd':lxzd})
+                df = self._prepare_df(df,req)
+                content = self._to_html(df,columns=['code','mc'])
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/fx4")
+        async def fx4(req:Request):
+            """fx4"""
+            try:
+                codes = self._get_request_codes(req)
+                sdate = req.query_params.get('sdate')
+                if not sdate:
+                    sdate = '2024-01-01 00:00:00'
+                df = self.fx4(codes,sdate)
                 df = self._prepare_df(df,req)
                 content = self._to_html(df,columns=['code','mc'])
                 return HTMLResponse(content=content)

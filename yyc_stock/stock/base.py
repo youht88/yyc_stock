@@ -62,6 +62,23 @@ class StockBase:
                             df = df.filter(columns)
                         df.to_sql(table_name,index=False,if_exists="append",con=sqlite3.connect(db_name))
                 return results
+    def _get_request_codes(self,req:Request):
+        code = req.query_params.get('code')
+        zx = req.query_params.get('zx')
+        bk = req.query_params.get('bk')
+        codes = []
+        if not code and not zx and not bk:
+            raise Exception('必须指定code或zx或bk参数')
+        if code:
+            codes_info = [self._get_stock_code(item) for item in code.split(',') if item]
+            codes = [item['code'] for item in codes_info]
+        elif zx:
+            codes_info = self._get_zx_codes(zx)
+            codes = [item['code'] for item in codes_info]
+        elif bk:
+            codes_info = self._get_bk_codes(bk)
+            codes = [item['dm'] for item in codes_info]
+        return codes
     def _get_zx_codes(self,key:str)->list[dict]:
         try:
             df = pd.read_sql(f"select * from zx where key='{key}'",self.sqlite)
