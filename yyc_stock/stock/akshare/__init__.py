@@ -849,7 +849,6 @@ class AkshareStock(StockBase):
                     df = ak.stock_individual_fund_flow_rank(indicator=period_str)
                 else:
                     df = ak.stock_sector_fund_flow_rank(indicator=period_str,sector_type=type_str)
-                df = df[df.最新价!='-']
                 df = df.rename(columns={"代码":"dm","名称":"mc","最新价":"zxj",f"{period_str}涨跌幅":f"zd{period}",
                                         f"{period_str}主力净流入-净额":f"zljlr{period}",f"{period_str}主力净流入-净占比":f"zljlrl{period}",
                                         f"{period_str}超大单净流入-净额":f"cddjlr{period}",f"{period_str}超大单净流入-净占比":f"cddjlrl{period}",
@@ -857,6 +856,7 @@ class AkshareStock(StockBase):
                                         f"{period_str}中单净流入-净额":f"zdjlr{period}",f"{period_str}中单净流入-净占比":f"zdjlrl{period}",
                                         f"{period_str}小单净流入-净额":f"xdjlr{period}",f"{period_str}小单净流入-净占比":f"xdjlrl{period}",
                                         })
+                df = df[df[f"zd{period}"]!='-']
                 df.pop("序号")
                 df = self._prepare_df(df,req)
                 content = self._to_html(df)
