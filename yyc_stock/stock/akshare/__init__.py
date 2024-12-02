@@ -827,6 +827,44 @@ class AkshareStock(StockBase):
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/flow/rank/gg")
+        async def flow_rank_gg0(req:Request):
+            """获取当前资金流数据"""
+            try:
+                #sector_type: choice of {"行业资金流", "概念资金流", "地域资金流"}
+                periods={"0":"今日","3":"3日","5":"5日","10":"10日"}
+                merged_df=pd.DataFrame()
+                for period in periods:
+                    period_str = periods[period]
+                    df = ak.stock_individual_fund_flow_rank(indicator=period_str)
+                    df = df.rename(columns={"代码":"dm","名称":"mc","最新价":"zxj",f"{period_str}涨跌幅":f"zd{period}",
+                                            f"{period_str}主力净流入-净额":f"zljlr{period}",f"{period_str}主力净流入-净占比":f"zljlrl{period}",
+                                            f"{period_str}超大单净流入-净额":f"cddjlr{period}",f"{period_str}超大单净流入-净占比":f"cddjlrl{period}",
+                                            f"{period_str}大单净流入-净额":f"ddjlr{period}",f"{period_str}大单净流入-净占比":f"ddjlrl{period}",
+                                            f"{period_str}中单净流入-净额":f"zdjlr{period}",f"{period_str}中单净流入-净占比":f"zdjlrl{period}",
+                                            f"{period_str}小单净流入-净额":f"xdjlr{period}",f"{period_str}小单净流入-净占比":f"xdjlrl{period}",
+                                            })
+                    df = df[df[f"zljlrl{period}"]!='-']
+                    df = df[df[f"zljlrl{period}"]>0]
+                    df.pop("序号")
+                    if merged_df.empty:
+                        merged_df = df.copy()
+                    else:
+                        df.pop("mc")
+                        df.pop("zxj")
+                        merged_df = pd.merge(merged_df,df,on="dm")
+                merged_df["jlr0"]=merged_df.eval("cddjlr0+ddjlr0+zdjlr0+xdjlr0")                        
+                merged_df["jlr3"]=merged_df.eval("cddjlr3+ddjlr3+zdjlr3+xdjlr3")                        
+                merged_df["jlr5"]=merged_df.eval("cddjlr5+ddjlr5+zdjlr5+xdjlr5")                        
+                merged_df["jlr10"]=merged_df.eval("cddjlr10+ddjlr10+zdjlr10+xdjlr10")                        
+                merged_df["_order"]=merged_df.eval("zljlrl3*zljlrl5*zljlrl10")
+                df = merged_df.sort_values(by="_order",ascending=False).reset_index()
+                df = self._prepare_df(df,req)
+                content = self._to_html(df)
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+
         @self.router.get("/flow/rank/{type}/{period}")
         async def flow_rank_gg(type:str,period:str,req:Request):
             """获取当前资金流数据"""

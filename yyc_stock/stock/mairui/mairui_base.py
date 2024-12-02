@@ -58,6 +58,7 @@ class MairuiBase(StockBase):
                 try:
                     #print(f"{self.mairui_api_url}/{method_path}/{self.mairui_token}")
                     res = requests.get(f"{self.mairui_api_url}/{method_path}/{self.mairui_token}")
+                    print("?????",res)
                     data = res.json()
                     if isinstance(data,list):
                         data = [{**item,**add_fields} for item in data]
