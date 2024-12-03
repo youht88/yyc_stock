@@ -188,6 +188,12 @@ class AkshareStock(StockBase):
                         df_price['vt'] = df_price['e'].apply(lambda x:'cdd' if x>=1000000 else 'dd' if x>=200000 else 'zd' if x>=40000 else 'xd')
                         df_price['cnt']=1
                         df_price = df_price.groupby(['xz','tt','p','vt'])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+                        df_price_s = df_price[df_price['xz']=='卖盘']
+                        df_price_b = df_price[df_price['xz']=='买盘']
+                        df_price = pd.merge(df_price_s,df_price_b,on=['p','tt','vt'],how='outer',suffixes=['_s','_b'])
+                        df_price = df_price.drop(columns=['xz_s','xz_b']).fillna(0)
+                        df_price['v_jlr']=df_price['v_b']-df_price['v_s']
+                        df_price['e_jlr']=df_price['e_b']-df_price['e_s']
                         df_price['code']=code
                         df_price['date']=date
                         df_price['mc']=mc
@@ -392,7 +398,7 @@ class AkshareStock(StockBase):
             days=15
             error_code_info=[]
             error_msg=""
-            sdate = '2022-01-01'
+            sdate = '2024-01-01'
             try:
                 total_max_date = daily_db.execute(f"select max(d) from {table}").fetchall()[0][0][:10]
                 print(f"total_max_date on daily.db is {total_max_date}")
