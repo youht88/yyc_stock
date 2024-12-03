@@ -381,9 +381,13 @@ class AkshareStock(StockBase):
         daily_pro_db=sqlite3.connect("daily_pro.db")
         table = "daily"
         codes_info = self._get_bk_codes("hs_a")
-        #codes_info = codes_info[:100]
+        #codes_info = codes_info[:10]
         #codes_info=[{'dm':'300159','mc':'新研股份'}]
         print("total codes:",len(codes_info))
+        flow_cols={'日期': 'd', '主力净流入-净额': 'zljlr', '主力净流入-净占比': 'zljlrl', 
+                              '超大单净流入-净额': 'cddjlr', '超大单净流入-净占比': 'cddjlrl', '大单净流入-净额': 'ddjlr', '大单净流入-净占比': 'ddjlrl',
+                              '中单净流入-净额': 'zdjlr', '中单净流入-净占比': 'zdjlrl', '小单净流入-净额': 'xdjlr', '小单净流入-净占比': 'xdjlrl'}
+                    
         with tqdm(total=len(codes_info),desc="进度") as pbar:
             days=15
             error_code_info=[]
@@ -397,12 +401,13 @@ class AkshareStock(StockBase):
             for code_info in codes_info:
                 code = code_info['dm']
                 mc = code_info['mc']
+                jys = code_info['jys']
                 new_sdate = sdate
                 max_date=None
                 try:
                     max_date=daily_pro_db.execute(f"select max_d from info where code='{code}'").fetchall()
                     if max_date:
-                        max_date = max_date[0][0][:10]
+                        max_date = max_date[0][0]
                         if max_date>=total_max_date:
                             pbar.update(1)
                             continue   
@@ -422,11 +427,18 @@ class AkshareStock(StockBase):
                         print(f"{code}-{mc} > new_sdate={new_sdate},没有找到该数据!")
                         pbar.update(1)
                         continue 
-                    if max_date and max_date >= origin_df['d'].iloc[-1][:10]:
+                    if max_date and max_date >= origin_df['d'].iloc[-1]:
                         print(f"{code}-{mc},no deed because of data exists!")
                         pbar.update(1)
                         continue 
                     df = origin_df.reset_index() 
+                    df.d = pd.to_datetime(df.d)
+                    
+                    df_flow = ak.stock_individual_fund_flow(code, market=jys)
+                    df_flow = df_flow.rename(columns=flow_cols).drop(columns=["收盘价","涨跌幅"])
+                    df_flow.d = pd.to_datetime(df_flow.d)
+                    
+                    df = pd.merge(df,df_flow,on='d',how="left")
                     df_add_cols={}
                     # 后15天涨跌幅
                     for col in ['zd']:
@@ -478,13 +490,13 @@ class AkshareStock(StockBase):
                             df_add_cols[f'pct{idx+1}{col}'] = df[col].pct_change(idx) * 100 
                     
                     # 前15天关键指标          
-                    for col in ['o','c','h','l','zd','v','e','hs','zf']:
+                    for col in ['o','c','h','l','zd','v','e','hs','zf','zljlr','cddjlr','ddjlr','zdjlr','xdjlr']:
                         for idx in range(days):
                             t=idx+1
                             df_add_cols[f'{col}{t}']=df[col].shift(t)
                     #
                     df_cols = pd.concat(list(df_add_cols.values()), axis=1, keys=list(df_add_cols.keys()))
-                    df = pd.concat([origin_df,df_cols],axis=1)
+                    df = pd.concat([df,df_cols],axis=1)
                     # 之前的kdj、macd
                     fields={'kl','dl','jl','dif','dea','macd'}
                     for key in fields:
@@ -525,12 +537,10 @@ class AkshareStock(StockBase):
                                             break
                                 count = count*-1 
                             df.at[i, key] = count
-                
                     if max_date:
                         new_sdate = datetime.strftime(d_max_date + timedelta(days=1),"%Y-%m-%d")
                         df = df[df['d']>=new_sdate]
-                    
-                    info_max_date = df.iloc[-1]['d'][:10]
+                    info_max_date = df.iloc[-1]['d'].strftime("%Y-%m-%d")
                     if error_msg=="no_daily_table":
                         error_msg=""
                         print("create daily & info table ->",code,info_max_date)
@@ -857,8 +867,8 @@ class AkshareStock(StockBase):
                 merged_df["jlr3"]=merged_df.eval("cddjlr3+ddjlr3+zdjlr3+xdjlr3")                        
                 merged_df["jlr5"]=merged_df.eval("cddjlr5+ddjlr5+zdjlr5+xdjlr5")                        
                 merged_df["jlr10"]=merged_df.eval("cddjlr10+ddjlr10+zdjlr10+xdjlr10")                        
-                merged_df["_order"]=merged_df.eval("zljlrl3*zljlrl5*zljlrl10")
-                df = merged_df.sort_values(by="_order",ascending=False).reset_index()
+                # merged_df["__order"]=merged_df.eval("zljlrl3*zljlrl5*zljlrl10")
+                # df = merged_df.sort_values(by="__order",ascending=False).reset_index()
                 df = self._prepare_df(df,req)
                 content = self._to_html(df)
                 return HTMLResponse(content=content)
