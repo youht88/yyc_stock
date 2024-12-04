@@ -637,7 +637,7 @@ class AkshareStock(StockBase):
         lxzdt = kwarg.get('lxzdt')
         cond = []
         if sdate:
-            cond.append(f"d > '{sdate}'")
+            cond.append(f"d >= '{sdate}'")
         if lxzd:
             cond.append(f"lxzd = {lxzd}") 
         if lxzdt:
@@ -683,7 +683,7 @@ class AkshareStock(StockBase):
         codes_str = ",".join([f"'{code}'" for code in codes])
         cond = []
         if sdate:
-            cond.append(f"t > '{sdate}'")
+            cond.append(f"t >= '{sdate}'")
         #cond.append(f"abs(kl - dl) < 1 and kl > kl1 and kl1 > kl2 and dif>0 and dea>0 and macd > macd1 and macd1 < macd2 and macd<0 and macd1<0 and macd2<0") 
         #cond.append(f"(abs(macd1)-abs(macd))/abs(macd)>0.5 and abs(macd1) > abs(macd2) and macd<0 and macd1<0 and macd2<0 and c>h1 and v>v1") 
         #cond.append(f"hs>3 and hs1>3 and hs2>3 and hs<5 and hs1<5 and hs2<5")
@@ -697,8 +697,46 @@ class AkshareStock(StockBase):
                         'c_status','v_status','lxzd','lxsf',
                         'lxzdt','kl','kl1','kl2','dl','dl1','dl2','dif','dea','macd','macd1','macd2',
                         'ma20c','ma40c',
-                        'prod5c','prod10c','prod20c','sum5v','sum10v','sum20v',
+                        'pct5c','pct10c','pct20c','sum5v','sum10v','sum20v',
                         ])
+        return df
+
+    def fx5(self,codes=[],sdate=None,kwarg={}):
+        daily_pro_db = sqlite3.connect("daily_pro.db")
+        codes_str = ",".join([f"'{code}'" for code in codes])
+        cond = []
+        if sdate:
+            cond.append(f"d >= '{sdate}'")
+        #cond.append(f"abs(kl - dl) < 1 and kl > kl1 and kl1 > kl2 and dif>0 and dea>0 and macd > macd1 and macd1 < macd2 and macd<0 and macd1<0 and macd2<0") 
+        #cond.append(f"(abs(macd1)-abs(macd))/abs(macd)>0.5 and abs(macd1) > abs(macd2) and macd<0 and macd1<0 and macd2<0 and c>h1 and v>v1") 
+        cond.append(f"zljlr>0 and zljlr1>0 and zljlr2>0 and zljlr3>0 and zljlr4>0 and zljlr5>0")
+        cond_str = ' and '.join(cond)
+        if cond_str:
+            cond_str = ' and ' + cond_str
+        print(cond_str)     
+        df = pd.read_sql(f"select * from daily where code in ({codes_str}) {cond_str}",daily_pro_db)
+        df = df.filter(['d','code','mc','o','c','h','l','v','e','zf','zd','hs',
+                        'pzd_1','pzd_2','pzd_3','pzd_4','pzd_5',
+                        'c_status','v_status','lxzd','lxsf','lxzdt',
+                        'zljlrl','cddjlrl','ddjlrl','zdjlrl','xdjlrl',
+                        'zljlr','zljlr1','zljlr2','zljlr3','zljlr4','zljlr5','zljlr6','zljlr7','zljlr8',
+                        'pct5c','pct10c','pct20c',
+                        ])
+        return df
+    def fx6(self,codes=[],sdate=None,kwarg={}):
+        price_db = sqlite3.connect("price.db")
+        codes_str = ",".join([f"'{code}'" for code in codes])
+        cond = []
+        if sdate:
+            cond.append(f"date >= '{sdate}'")
+        #cond.append(f"abs(kl - dl) < 1 and kl > kl1 and kl1 > kl2 and dif>0 and dea>0 and macd > macd1 and macd1 < macd2 and macd<0 and macd1<0 and macd2<0") 
+        #cond.append(f"(abs(macd1)-abs(macd))/abs(macd)>0.5 and abs(macd1) > abs(macd2) and macd<0 and macd1<0 and macd2<0 and c>h1 and v>v1") 
+        #cond.append(f"zljlr>0 and zljlr1>0 and zljlr2>0 and zljlr3>0 and zljlr4>0 and zljlr5>0")
+        cond_str = ' and '.join(cond)
+        if cond_str:
+            cond_str = ' and ' + cond_str
+        print(cond_str)     
+        df = pd.read_sql(f"select * from price where code in ({codes_str}) {cond_str}",price_db)
         return df
 
     def register_router(self):
@@ -838,6 +876,34 @@ class AkshareStock(StockBase):
                 if not sdate:
                     sdate = '2024-01-01 00:00:00'
                 df = self.fx4(codes,sdate)
+                df = self._prepare_df(df,req)
+                content = self._to_html(df,columns=['code','mc'])
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/fx5")
+        async def fx5(req:Request):
+            """fx5"""
+            try:
+                codes = self._get_request_codes(req)
+                sdate = req.query_params.get('sdate')
+                if not sdate:
+                    sdate = '2024-01-01'
+                df = self.fx5(codes,sdate)
+                df = self._prepare_df(df,req)
+                content = self._to_html(df,columns=['code','mc'])
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/fx6")
+        async def fx6(req:Request):
+            """fx6"""
+            try:
+                codes = self._get_request_codes(req)
+                sdate = req.query_params.get('sdate')
+                if not sdate:
+                    sdate = '2024-01-01'
+                df = self.fx6(codes,sdate)
                 df = self._prepare_df(df,req)
                 content = self._to_html(df,columns=['code','mc'])
                 return HTMLResponse(content=content)
