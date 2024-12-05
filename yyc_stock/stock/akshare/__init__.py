@@ -436,7 +436,7 @@ class AkshareStock(StockBase):
         daily_pro_db=sqlite3.connect("daily_pro.db")
         table = "daily"
         codes_info = self._get_bk_codes("hs_a")
-        #codes_info = codes_info[:10]
+        #codes_info = codes_info[:100]
         #codes_info=[{'dm':'300159','mc':'新研股份'}]
         print("total codes:",len(codes_info))
         flow_cols={'日期': 'd', '主力净流入-净额': 'zljlr', '主力净流入-净占比': 'zljlrl', 
@@ -552,15 +552,15 @@ class AkshareStock(StockBase):
                     #
                     df_cols = pd.concat(list(df_add_cols.values()), axis=1, keys=list(df_add_cols.keys()))
                     df = pd.concat([df,df_cols],axis=1)
-                    # 之前的kdj、macd
-                    fields={'kl','dl','jl','dif','dea','macd'}
+                    # 之前的kdj、macd、ma
+                    fields={'kl','dl','jl','dif','dea','macd','ma5c','ma10c','ma20c'}
                     for key in fields:
                         df[f"{key}1"]=df[f"{key}"].shift(1)
                         df[f"{key}2"]=df[f"{key}"].shift(2)
                     # 连续上涨、下跌天数,正负数表示
                     # 连续缩放量天数,正负数表示
                     # 连续涨跌停天数,正负数表示
-                    fields={'lxzd':'c','lxsf':'v','lxzdt':'zd'}
+                    fields={'lxzd':'c','lxsf':'v','lxzdt':'zd','lxzljlr':'zljlr'}
                     for key in fields:
                         df[key] = 0
                         for i in range(len(df)):
@@ -569,6 +569,11 @@ class AkshareStock(StockBase):
                                 j_str = '' if j==0 else str(j)
                                 if key=='lxzdt':
                                     if df.loc[i, f"{fields[key]}{j_str}"] > 9.9:
+                                        count += 1
+                                    else:
+                                        break
+                                elif key=='lxzljlr':
+                                    if df.loc[i, f"{fields[key]}{j_str}"] > 0:
                                         count += 1
                                     else:
                                         break
@@ -582,6 +587,11 @@ class AkshareStock(StockBase):
                                     j_str = '' if j==0 else str(j)
                                     if key=='lxzdt':
                                         if df.loc[i, f"{fields[key]}{j_str}"] < -9.9:
+                                            count += 1
+                                        else:
+                                            break
+                                    elif key=='lxzljlr':
+                                        if df.loc[i, f"{fields[key]}{j_str}"] < 0:
                                             count += 1
                                         else:
                                             break
@@ -684,6 +694,7 @@ class AkshareStock(StockBase):
         lxzd = kwarg.get('lxzd')
         lxsf = kwarg.get('lxsf')
         lxzdt = kwarg.get('lxzdt')
+        lxzljlr = kwarg.get('lxzljlr')
         cond = []
         if sdate:
             cond.append(f"d >= '{sdate}'")
@@ -693,15 +704,20 @@ class AkshareStock(StockBase):
             cond.append(f"lxzdt = {lxzdt}") 
         if lxsf:
             cond.append(f"lxsf = {lxsf}")
+        if lxzljlr:
+            cond.append(f"lxzljlr = {lxzljlr}")
         cond_str = ' and '.join(cond)
         if cond_str:
             cond_str = ' and ' + cond_str
         print(cond_str)     
         df = pd.read_sql(f"select * from daily where code in ({codes_str}) {cond_str}",daily_pro_db)
-        df = df.filter(['d','code','mc','o','c','h','l','v','e','zf','zd','hs',
+        df = df.filter(['d','code','mc','o','c','h','l','v','e','zf','zd','hs','zljlr',
                         'pzd_1','pzd_2','pzd_3','pzd_4','pzd_5',
-                        'c_status','v_status','lxzd','lxsf',
-                        'lxzdt','zd1','zd2','zd3','zd4','kl','dl','jl','dif','dea','macd','ma20c','ma40c',
+                        'c_status','v_status','lxzd','lxsf','lxzdt','lxzljlr',
+                        'zljlr1','zljlr2','zljlr3','zljlr4','zljlr5',
+                        'zd1','zd2','zd3','zd4',
+                        'kl','kl1','kl2','dl','dl1','dl2','jl','jl1','jl2','dif','dif1','dif2','dea','dea1','dea2','macd','macd1','macd2',
+                        'ma5c','ma5c1','ma5c2','ma10c','ma10c1','ma10c2','ma20c','ma20c1','ma20c2',
                         'prod5c','prod10c','prod20c','sum5v','sum10v','sum20v',
                         ])
         return df
@@ -889,9 +905,14 @@ class AkshareStock(StockBase):
                     lxzdt=int(lxzdt)
                 else:
                     lxzdt=None
-                if not lxzd and not lxzdt and not lxsf:
-                    raise Exception("至少须指定lxzd,lxsf,lxzdt中的一个参数")
-                df = self.fx2(codes,sdate,{'lxzd':lxzd,'lxsf':lxsf,'lxzdt':lxzdt})
+                lxzljlr = req.query_params.get('lxzljlr')
+                if lxzljlr:
+                    lxzljlr=int(lxzljlr)
+                else:
+                    lxzljlr=None
+                if not lxzd and not lxzdt and not lxsf and not lxzljlr:
+                    raise Exception("至少须指定lxzd,lxsf,lxzdt,lxzljlr中的一个参数")
+                df = self.fx2(codes,sdate,{'lxzd':lxzd,'lxsf':lxsf,'lxzdt':lxzdt,'lxzljlr':lxzljlr})
                 df = self._prepare_df(df,req)
                 content = self._to_html(df,columns=['code','mc'])
                 return HTMLResponse(content=content)
