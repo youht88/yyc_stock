@@ -494,11 +494,20 @@ class StockBase:
             raise Exception(f"{order}表达式不正确")
         df = df.sort_values(by=order,ascending=False)
         return df
-    def _to_html(self,df:pd.DataFrame,columns:list[str]=[]):
+    def _to_html(self,df:pd.DataFrame,columns:list[str]=[],formats:str=None):
         df_state = df.describe()
         df_state.loc['sum']=df[df.select_dtypes(include=['int', 'float']).columns].sum()
         state = df_state.to_html()
-        data = df.to_html()
+        if formats:
+            #example f=e_s:10000000,50000000;e_jlr:0,0;v_jlr:0,0
+            formats = [item.split(":") for item in formats.split(";")]
+            formats = [[item[0]]+[float(x) for x in item[1].split(",")] for item in formats]
+            print("formats=",formats)
+            formaters = {item[0]: lambda y, fmt='{:,.2f}',min=item[1],max=item[2]: '<span style="color: {}">{}</span>'.format('red' if y>max else 'green' if y<min else 'blac\
+    k',fmt.format(y)) for item in formats}
+        else:
+            formaters = None
+        data = df.to_html(escape=False,formatters=formaters,border=1)
         col_text = ''
         for col in columns:
             col_text +='<p>' + ','.join(list(set(df[col].tolist()))) + '</p>\n'

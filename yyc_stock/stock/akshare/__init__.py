@@ -1,6 +1,7 @@
 import json
 import sqlite3
 from fastapi import HTTPException, Request
+from fastapi.datastructures import QueryParams
 from fastapi.responses import HTMLResponse
 import pandas as pd
 import requests
@@ -545,7 +546,7 @@ class AkshareStock(StockBase):
                             df_add_cols[f'pct{idx+1}{col}'] = df[col].pct_change(idx) * 100 
                     
                     # 前15天关键指标          
-                    for col in ['o','c','h','l','zd','v','e','hs','zf','zljlr','cddjlr','ddjlr','zdjlr','xdjlr']:
+                    for col in ['o','c','h','l','zd','v','e','hs','zf','zljlr','zljlrl','cddjlrl','ddjlrl','zdjlrl','xdjlrl']:
                         for idx in range(days):
                             t=idx+1
                             df_add_cols[f'{col}{t}']=df[col].shift(t)
@@ -788,12 +789,15 @@ class AkshareStock(StockBase):
                         'pct5c','pct10c','pct20c',
                         ])
         return df
-    def fx6(self,codes=[],sdate=None,kwarg={}):
+    def fx6(self,codes=[],sdate=None,kwarg:QueryParams=None):
         price_db = sqlite3.connect("price.db")
         codes_str = ",".join([f"'{code}'" for code in codes])
         cond = []
         if sdate:
             cond.append(f"date >= '{sdate}'")
+        # if kwarg:
+        #     f = kwarg.get("f")
+        #     print("f=",f)
         #cond.append(f"abs(kl - dl) < 1 and kl > kl1 and kl1 > kl2 and dif>0 and dea>0 and macd > macd1 and macd1 < macd2 and macd<0 and macd1<0 and macd2<0") 
         #cond.append(f"(abs(macd1)-abs(macd))/abs(macd)>0.5 and abs(macd1) > abs(macd2) and macd<0 and macd1<0 and macd2<0 and c>h1 and v>v1") 
         #cond.append(f"zljlr>0 and zljlr1>0 and zljlr2>0 and zljlr3>0 and zljlr4>0 and zljlr5>0")
@@ -986,9 +990,10 @@ class AkshareStock(StockBase):
                 sdate = req.query_params.get('sdate')
                 if not sdate:
                     sdate = '2024-01-01'
-                df = self.fx6(codes,sdate)
+                df = self.fx6(codes,sdate,req.query_params)
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['code','mc'])
+                formats = req.query_params.get("f")
+                content = self._to_html(df,columns=['code','mc'],formats=formats)
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
