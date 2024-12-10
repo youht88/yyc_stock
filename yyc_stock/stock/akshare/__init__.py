@@ -181,8 +181,8 @@ class AkshareStock(StockBase):
                     print("error on {code}-{mc}",e)               
         return pd.concat([df_jhjj,df_price])
         #return df_price
-    def price_hist(self):
-        price_db=sqlite3.connect("price.db")
+    def price_hist(self,delta=30):
+        price_db=sqlite3.connect(f"price_{delta}.db")
         jhjj_db=sqlite3.connect("jhjj.db")
         table = "price"
         codes_info = self._get_bk_codes("hs_a")
@@ -215,9 +215,8 @@ class AkshareStock(StockBase):
                     if not df.empty:
                         df=df.rename(columns={'时间':'t','成交价':'p','手数':'v','买卖盘性质':'xz'})
                         
-                        df['tt']=df['t'].apply(lambda x:0 if x<'09:25:00' else 1 if x<'10:30:00' else 2 if x<'11:30:00' else 3 if x<'14:00:00' else 4)
-                        df_jhjj = df[df.tt==0].copy()
-                        df_jhjj['tt'] = df_jhjj['t'].apply(lambda x:0 if x<'09:20:00' else 1 )
+                        df_jhjj = df[df.t<'09:25:00'].copy()
+                        df_jhjj['tt'] = 0
                         df_jhjj['v0']=df_jhjj.groupby(['tt','p']).v.diff().fillna(df_jhjj.v)
                         df_jhjj['e']=df_jhjj.p*df_jhjj.v0*100
                         df_jhjj['vt'] = df_jhjj['e'].apply(lambda x:'cdd' if abs(x)>=1000000 else 'dd' if abs(x)>=200000 else 'zd' if abs(x)>=40000 else 'xd')
@@ -232,12 +231,19 @@ class AkshareStock(StockBase):
                             df_jhjj.to_sql("price",if_exists="replace",index=False,con=jhjj_db)
                             jhjj_db.execute("create unique index index_price on price(code,date,tt,p,vt)")
                         else:
-                            df_jhjj.to_sql("price",if_exists="append",index=False,con=jhjj_db)
-                        
-                        df_price = df[df.tt>0].copy()
+                            try:
+                                df_jhjj.to_sql("price",if_exists="append",index=False,con=jhjj_db)
+                            except:
+                                pass
+
+                        df_price = df[df.t>='09:25:00'].copy()
+                        df_price['tx'] = (df_price.t.dt.hour*3600+df_price.t.dt.minute*60+df_price.t.dt.second)//delta*delta
+                        df_price['tx'] = pd.to_datetime(df_price['tx'], unit='s').dt.strftime('%H:%M:%S')
                         df_price['e']=df_price.p*df_price.v*100
-                        df_price['vt'] = df_price['e'].apply(lambda x:'cdd' if x>=1000000 else 'dd' if x>=200000 else 'zd' if x>=40000 else 'xd')
                         df_price['cnt']=1
+                        df_price = df_price.groupby(by=["xz","tx","p"])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+                        df_price['tt']=df_price['tx'].apply(lambda x:0 if x<'09:25:00' else 1 if x<'10:30:00' else 2 if x<'11:30:00' else 3 if x<'14:00:00' else 4)
+                        df_price['vt'] = df_price['e'].apply(lambda x:'cdd' if x>=1000000 else 'dd' if x>=200000 else 'zd' if x>=40000 else 'xd')
                         df_price = df_price.groupby(['xz','tt','p','vt'])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
                         df_price_s = df_price[df_price['xz']=='卖盘']
                         df_price_b = df_price[df_price['xz']=='买盘']
@@ -831,11 +837,11 @@ class AkshareStock(StockBase):
             """更新15分钟增强数据"""
             error_code_info=self.minute_pro()
             return {"message":f"minute_pro已完成,error_code_info={error_code_info}"}
-        @self.router.get("/price/hist")
-        async def price_hist(req:Request):
+        @self.router.get("/price/hist/{delta}")
+        async def price_hist(delta:int,req:Request):
             """更新价格数据"""
             try:
-                error_code_info=self.price_hist()
+                error_code_info=self.price_hist(delta)
                 return {"message":f"price已完成,error_code_info={error_code_info}"}
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")       
@@ -1289,6 +1295,36 @@ class AkshareStock(StockBase):
                 #return self._get_akbk_codes('BK1027')
                 #return self._get_bk_codes('chgn_700129')
                 return self.bk_refresh()
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/test/{code}")
+        async def _test(code:str,req:Request):
+            """分析连续下跌信息"""
+            try:
+                df = ak.stock_intraday_em(code)
+                df = df.rename(columns={"时间":"t","成交价":"p","手数":"v","买卖盘性质":"xz"})
+                df = df[df.t>="09:25:00"]
+                df['t'] = pd.to_datetime(df['t'])
+                df['tx'] = (df.t.dt.hour*3600+df.t.dt.minute*60+df.t.dt.second)//1*1
+                df['tx'] = pd.to_datetime(df['tx'], unit='s').dt.strftime('%H:%M:%S')
+                df['cnt']=1
+                df['e']=df.v * df.p * 100
+                df = df.groupby(by=["xz","tx","p"])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+                df['vt'] = df['e'].apply(lambda x:'cdd' if abs(x)>=1000000 else 'dd' if abs(x)>=200000 else 'zd' if abs(x)>=40000 else 'xd')
+                df['tt']=df['tx'].apply(lambda x:0 if x<'09:25:00' else 1 if x<'10:30:00' else 2 if x<'11:30:00' else 3 if x<'14:00:00' else 4)
+                df_price = df.groupby(by=["xz","tt","vt","p"])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+                df_price_s = df_price[df_price['xz']=='卖盘']
+                df_price_b = df_price[df_price['xz']=='买盘']
+                df_price = pd.merge(df_price_s,df_price_b,on=['p','tt','vt'],how='outer',suffixes=['_s','_b'])
+                df_price = df_price.drop(columns=['xz_s','xz_b']).fillna(0)
+                df_price['v_jlr']=df_price['v_b']-df_price['v_s']
+
+                df_price['e_jlr']=df_price['e_b']-df_price['e_s']
+                df_price.sort_values(by=["tt","p","vt"],inplace=True)
+                df_price = df_price.groupby(by="vt").sum().reset_index()
+                df_price = self._prepare_df(df_price,req)
+                content = self._to_html(df_price)
+                return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
     
