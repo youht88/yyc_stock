@@ -191,7 +191,8 @@ class AkshareStock(StockBase):
         print("total codes:",len(codes_info))
         price_error_msg=""
         jhjj_error_msg=""
-        if int(datetime.today().strftime("%H"))<=16:
+        if int(datetime.today().strftime("%H"))<16:
+            print("today=",datetime.today())
             raise Exception("请在当天交易结束后,16点后执行")
         try:
             price_db.execute(f"select * from {table} limit 1")
@@ -715,7 +716,7 @@ class AkshareStock(StockBase):
         df = df.filter(['d','code','mc','o','c','h','l','v','e','zf','zd','hs','zljlr',
                         'pzd_1','pzd_2','pzd_3','pzd_4','pzd_5',
                         'c_status','v_status','lxzd','lxsf','lxzdt','lxzljlr',
-                        'zljlr1','zljlr2','zljlr3','zljlr4','zljlr5',
+                        'zljlrl','zljlrl1','zljlrl2','zljlrl3','zljlrl4','zljlrl5',
                         'zd1','zd2','zd3','zd4',
                         'kl','kl1','kl2','dl','dl1','dl2','jl','jl1','jl2','dif','dif1','dif2','dea','dea1','dea2','macd','macd1','macd2',
                         'ma5c','ma5c1','ma5c2','ma10c','ma10c1','ma10c2','ma20c','ma20c1','ma20c2',
@@ -1077,7 +1078,8 @@ class AkshareStock(StockBase):
             try:
                 df = self.current()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df)
+                formats = req.query_params.get("f")
+                content = self._to_html(df,formats=formats,columns=['代码','名称'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
