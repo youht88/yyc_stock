@@ -236,7 +236,7 @@ class AkshareStock(StockBase):
                                 pass
 
                         df_price = df[df.t>='09:25:00'].copy()
-                        df_price['t'] = pd.to_datetime(df_price['t'])
+                        df_price['t'] = pd.to_datetime(df_price['t'],format='%H:%M:%S')
                         df_price['tx'] = (df_price.t.dt.hour*3600+df_price.t.dt.minute*60+df_price.t.dt.second)//delta*delta
                         df_price['tx'] = pd.to_datetime(df_price['tx'], unit='s').dt.strftime('%H:%M:%S')
                         df_price['e']=df_price.p*df_price.v*100
