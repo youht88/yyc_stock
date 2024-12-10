@@ -214,7 +214,6 @@ class AkshareStock(StockBase):
                     #df=ak.stock_zh_a_tick_tx_js(code)
                     if not df.empty:
                         df=df.rename(columns={'时间':'t','成交价':'p','手数':'v','买卖盘性质':'xz'})
-                        
                         df_jhjj = df[df.t<'09:25:00'].copy()
                         df_jhjj['tt'] = 0
                         df_jhjj['v0']=df_jhjj.groupby(['tt','p']).v.diff().fillna(df_jhjj.v)
@@ -237,6 +236,7 @@ class AkshareStock(StockBase):
                                 pass
 
                         df_price = df[df.t>='09:25:00'].copy()
+                        df_price['t'] = pd.to_datetime(df_price['t'])
                         df_price['tx'] = (df_price.t.dt.hour*3600+df_price.t.dt.minute*60+df_price.t.dt.second)//delta*delta
                         df_price['tx'] = pd.to_datetime(df_price['tx'], unit='s').dt.strftime('%H:%M:%S')
                         df_price['e']=df_price.p*df_price.v*100
