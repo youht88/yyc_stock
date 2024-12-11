@@ -8,7 +8,7 @@ import logging
 import re
 import requests
 from rich import print
-
+from typing import Literal
 from ylz_utils.config import Config 
 from ylz_utils.database.elasticsearch import ESLib
 
@@ -62,22 +62,37 @@ class StockBase:
                             df = df.filter(columns)
                         df.to_sql(table_name,index=False,if_exists="append",con=sqlite3.connect(db_name))
                 return results
+    def _get_codes(self,type:Literal['stock','zx','bk','akbk'],name):
+        codes = []
+        if type=='stock':
+            codes_info = [self._get_stock_code(item) for item in name.split(',') if item]
+            codes = [item['code'] for item in codes_info]
+        elif type=='zx':
+            codes_info = self._get_zx_codes(name)
+            codes = [item['code'] for item in codes_info]
+        elif type=='bk':
+            codes_info = self._get_bk_codes(name)
+            codes = [item['dm'] for item in codes_info]
+        elif type=='akbk':
+            codes_info = self._get_akbk_codes(name)
+            codes = [item['dm'] for item in codes_info]
+        return codes        
     def _get_request_codes(self,req:Request):
-        code = req.query_params.get('code')
+        stock = req.query_params.get('code')
         zx = req.query_params.get('zx')
         bk = req.query_params.get('bk')
+        akbk = req.query_params.get('akbk')
         codes = []
-        if not code and not zx and not bk:
-            raise Exception('必须指定code或zx或bk参数')
-        if code:
-            codes_info = [self._get_stock_code(item) for item in code.split(',') if item]
-            codes = [item['code'] for item in codes_info]
+        if not stock and not zx and not bk and not akbk:
+            raise Exception('必须指定code、zx、bk、akbk参数中的一个')
+        if stock:
+            codes = self._get_codes('stock',stock)
         elif zx:
-            codes_info = self._get_zx_codes(zx)
-            codes = [item['code'] for item in codes_info]
+            codes = self._get_codes('zx',zx)
         elif bk:
-            codes_info = self._get_bk_codes(bk)
-            codes = [item['dm'] for item in codes_info]
+            codes = self._get_codes('bk',bk)
+        elif akbk:
+            codes = self._get_codes('akbk',akbk)
         return codes
     def _get_zx_codes(self,key:str)->list[dict]:
         try:
