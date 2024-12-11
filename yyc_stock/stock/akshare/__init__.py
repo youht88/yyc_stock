@@ -17,8 +17,10 @@ class AkshareStock(StockBase):
     def __init__(self):
         super().__init__()
         self.register_router()
-    def current(self):
+    def current(self,codes=None):
         df = ak.stock_zh_a_spot_em()
+        if codes:
+            df = df[df['代码'].isin(codes)]
         return df
     def index_info(self):
         df = ak.index_stock_info()
@@ -234,7 +236,6 @@ class AkshareStock(StockBase):
                                 df_jhjj.to_sql("price",if_exists="append",index=False,con=jhjj_db)
                             except:
                                 pass
-
                         df_price = df[df.t>='09:25:00'].copy()
                         df_price['t'] = pd.to_datetime(df_price['t'],format='%H:%M:%S')
                         df_price['tx'] = (df_price.t.dt.hour*3600+df_price.t.dt.minute*60+df_price.t.dt.second)//delta*delta
@@ -1297,33 +1298,16 @@ class AkshareStock(StockBase):
                 return self.bk_refresh()
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
-        @self.router.get("/test/{code}")
-        async def _test(code:str,req:Request):
+        @self.router.get("/test")
+        async def _test(req:Request):
             """分析连续下跌信息"""
             try:
-                df = ak.stock_intraday_em(code)
-                df = df.rename(columns={"时间":"t","成交价":"p","手数":"v","买卖盘性质":"xz"})
-                df = df[df.t>="09:25:00"]
-                df['t'] = pd.to_datetime(df['t'])
-                df['tx'] = (df.t.dt.hour*3600+df.t.dt.minute*60+df.t.dt.second)//1*1
-                df['tx'] = pd.to_datetime(df['tx'], unit='s').dt.strftime('%H:%M:%S')
-                df['cnt']=1
-                df['e']=df.v * df.p * 100
-                df = df.groupby(by=["xz","tx","p"])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
-                df['vt'] = df['e'].apply(lambda x:'cdd' if abs(x)>=1000000 else 'dd' if abs(x)>=200000 else 'zd' if abs(x)>=40000 else 'xd')
-                df['tt']=df['tx'].apply(lambda x:0 if x<'09:25:00' else 1 if x<'10:30:00' else 2 if x<'11:30:00' else 3 if x<'14:00:00' else 4)
-                df_price = df.groupby(by=["xz","tt","vt","p"])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
-                df_price_s = df_price[df_price['xz']=='卖盘']
-                df_price_b = df_price[df_price['xz']=='买盘']
-                df_price = pd.merge(df_price_s,df_price_b,on=['p','tt','vt'],how='outer',suffixes=['_s','_b'])
-                df_price = df_price.drop(columns=['xz_s','xz_b']).fillna(0)
-                df_price['v_jlr']=df_price['v_b']-df_price['v_s']
-
-                df_price['e_jlr']=df_price['e_b']-df_price['e_s']
-                df_price.sort_values(by=["tt","p","vt"],inplace=True)
-                df_price = df_price.groupby(by="vt").sum().reset_index()
-                df_price = self._prepare_df(df_price,req)
-                content = self._to_html(df_price)
+                #df = self._get_df_source(db_name="price_30.db",sql=f"select * from price where code='{code}'")
+                df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
+                codes = self._get_request_codes(req)
+                df = self.current(codes)
+                df = self._prepare_df(df,req)
+                content = self._to_html(df,formats=req.query_params.get('f'))
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")

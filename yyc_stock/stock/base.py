@@ -621,6 +621,20 @@ class StockBase:
         else:
             raise Exception(f"network error on fetch {mc} data with status code {res.status_code}")
     
+    def _get_df_source(self,db_name=None,sql=None,columns={},ak_func=None,**ak_kwargs):
+        df = pd.DataFrame()
+        if not (db_name and sql) and not ak_func:
+            raise Exception('必须指定db_name和sql，或者指定ak_func')
+        if db_name and sql:
+            conn = sqlite3.connect(db_name)
+            df = pd.read_sql(sql,conn)
+        elif ak_func:
+            if ak_kwargs:
+                df = ak_func(**ak_kwargs)
+            else:
+                df = ak_func()
+        df = df.rename(columns = columns)
+        return df
     def register_router(self):
         from .mairui.mairui_hszg import HSZG
         from .snowball import SnowballStock
