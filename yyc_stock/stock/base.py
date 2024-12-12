@@ -17,6 +17,169 @@ import concurrent.futures
 from fastapi import FastAPI, HTTPException,Request,Response,APIRouter
 import akshare as ak
 
+def gen_content_html(data_table,state_table,fix_col_index=[]):
+    if fix_col_index:
+        fix_columns = ','.join([f'th:nth-child({idx}), td:nth-child({idx})' for idx in fix_col_index])
+        fix_columns_css = fix_columns + ''' {
+                position: sticky;
+                left: 0;
+                background-color: #f9f9f9; /* 固定列的背景颜色 */
+                z-index: 2; /* 确保固定列在其他内容上方 */
+            }'''
+    else:
+        fix_columns_css = ''
+    #th.代码, td.代码, th.名称,td.名称     
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Sortable Table</title>
+        <style>
+            table {{
+                border-collapse: collapse;
+                width: 100%;
+            }}
+            td {{
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }}
+            th {{
+                position: sticky; /* 使表头固定 */
+                top: 0; /* 固定在顶部 */
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: center;
+                cursor: pointer;
+                background-color: #f2f2f2;
+            }}
+            th:hover {{
+                background-color: #ddd;
+            }}
+            
+            {fix_columns_css} 
+            tr:nth-child(even) {{
+                background-color: #f2f2f2; /* 偶数行背景色 */
+            }}
+            tr:nth-child(odd) {{
+                background-color: #ffffff; /* 奇数行背景色 */
+            }}
+            .copy-button {{
+                margin: 5px auto;
+                display: block;
+                cursor: pointer;
+                padding: 5px 10px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                text-align: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>统计 <button id="export_state_btn" class="btn btn-primary mt-3">导出为 CSV</button> </h2>
+        {state_table}
+        <h2>数据 <button id="export_data_btn" class="btn btn-primary mt-3">导出为 CSV</button> </h2>
+        {data_table}
+
+        <script>
+            function export_data(table_id) {{
+                // 获取表格数据
+                let table = document.getElementById(table_id);
+                let csv = [];
+                let row_count = 0;
+                for (let row of table.rows) {{
+                    let rowData = [];
+                    row_count ++;
+                    for (let cell of row.cells) {{
+                        let text = cell.innerText;
+                        let value = ''
+                        if (row_count==1){{
+                            value=""
+                            text = text.replace('Copy','').replace('\\n','')                     
+                        }}else{{
+                            value = parseFloat(text.replace(/,/g, '').replace(/E[+-]?\\d+/, 'e$&'));
+                        }}
+                        if (value){{
+                            rowData.push(value);
+                        }}else{{
+                            rowData.push(text);
+                        }}
+                    }}
+                    csv.push(rowData.join(','));
+                }}
+                let csvContent = 'data:text/csv;charset=utf-8,' + csv.join('\\n');
+                let encodedUri = encodeURI(csvContent);
+                let link = document.createElement('a');
+                link.setAttribute('href', encodedUri);
+                link.setAttribute('download', 'data.csv');
+                document.body.appendChild(link); // Required for FF
+                link.click();
+                document.body.removeChild(link); // Remove the link after downloading
+            }}
+            document.getElementById('export_state_btn').addEventListener('click', ()=>{{export_data('state_table')}});
+            document.getElementById('export_data_btn').addEventListener('click', ()=>{{export_data('data_table')}});
+            document.querySelectorAll('#data_table thead th').forEach((th,index) => {{
+                if (index>=0){{
+                    th.addEventListener('click', () => {{
+                        const table = th.parentElement.parentElement.parentElement;
+                        const tbody = table.querySelector('tbody');
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        const index = Array.from(th.parentNode.children).indexOf(th);
+                        const isAscending = th.classList.toggle('asc');
+
+                        rows.sort((a, b) => {{
+                            const aText = a.children[index].innerText;
+                            const bText = b.children[index].innerText;
+                            // 处理格式化的数字
+                            const aValue = parseFloat(aText.replace(/,/g, '').replace(/E[+-]?\\d+/, 'e$&'));
+                            const bValue = parseFloat(bText.replace(/,/g, '').replace(/E[+-]?\\d+/, 'e$&'));
+                            if (aValue && bValue) {{ 
+                                // 如果是数字，则进行比较，否则按字符串比较
+                                return isAscending ? aValue - bValue : bValue - aValue;
+                            }}else{{
+                                return isAscending ? aText.localeCompare(bText) : bText.localeCompare(aText);
+                            }}}});
+
+                        while (tbody.firstChild) {{
+                            tbody.removeChild(tbody.firstChild);
+                        }}
+                        tbody.append(...rows);
+                    }});
+                    // 在表头添加拷贝按钮
+                    const copyButton = document.createElement('button');
+                    copyButton.innerText = 'Copy';
+                    copyButton.className = 'copy-button';
+                    copyButton.onclick = (e) => {{
+                        e.stopPropagation();  // 防止触发排序
+                        copyColumn(index);
+                    }};
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.className = 'button-container';
+                    buttonContainer.appendChild(copyButton);
+                    th.appendChild(buttonContainer);
+                }}
+            }});
+            // 复制功能
+            function copyColumn(index) {{
+                const table = document.querySelector('#data_table');
+                const tbody = table.querySelector('tbody');
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const columnData = rows.map(row => row.children[index]?.innerText).join(',');
+
+                navigator.clipboard.writeText(columnData).then(() => {{
+                    console.log('Column copied to clipboard!');
+                }}).catch(err => {{
+                    console.error('Failed to copy: ', err);
+                }});
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return html_content
+
 class StockBase:
     stock:list = []
     def __init__(self):
@@ -509,10 +672,10 @@ class StockBase:
             raise Exception(f"{order}表达式不正确")
         df = df.sort_values(by=order,ascending=False)
         return df
-    def _to_html(self,df:pd.DataFrame,columns:list[str]=[],formats:str=None):
+    def _to_html(self,df:pd.DataFrame,columns:list[str]=None,formats:str=None,fix_columns:list[str]=[]):
         df_state = df.describe()
         df_state.loc['sum']=df[df.select_dtypes(include=['int', 'float']).columns].sum()
-        state = df_state.to_html()
+        state_table = df_state.to_html(table_id='state_table')
         if formats:
             #example f=e_s:10000000,50000000;e_jlr:0,0;v_jlr:0,0
             formats = [item.split(":") for item in formats.split(";")]
@@ -522,18 +685,12 @@ class StockBase:
     k',fmt.format(y)) for item in formats}
         else:
             formaters = None
-        data = df.to_html(escape=False,formatters=formaters,border=1)
-        col_text = ''
-        for col in columns:
-            col_text +='<p>' + ','.join(list(set(df[col].tolist()))) + '</p>\n'
-        content = (
-            "<html>\n"
-            f"{state}\n"
-            f"{data}\n"
-            f"{col_text}\n"
-            "</html>\n"
-        )
-        return content
+        data_table = df.to_html(table_id='data_table',index=False,escape=False,columns=columns,formatters=formaters)
+        columns = df.columns.to_list()
+        fix_col_index = list(filter(lambda x:x!=-1,[ columns.index(col)+1 if col in columns else -1 for col in fix_columns]))
+        content_html = gen_content_html(data_table,state_table,fix_col_index=fix_col_index)        
+        return content_html
+    
     def _kdj(self,prices, low_prices, high_prices, n=9, k=3, d=3):
         """
         计算KDJ指标。

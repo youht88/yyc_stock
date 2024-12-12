@@ -5,7 +5,7 @@ from ylz_utils.loger import LoggerLib
 from fastapi import FastAPI, HTTPException
 import fastapi_cdn_host
 
-from yyc_stock.stock.akshare import AkshareStock
+from yyc_stock.stock.akshare import *
 from yyc_stock.stock.snowball import *
 from yyc_stock.stock.mairui import *
 from yyc_stock.stock.base import *
@@ -13,7 +13,9 @@ class StockLib():
     def __init__(self):
         self.base = StockBase()
         self.snowball = SnowballStock()
-        self.akshare = AkshareStock()
+        self.ak_base = AkshareBase()
+        self.ak_refresh = AK_REFRESH()
+        self.ak_current = AK_CURRENT()
         self.hibk = HIBK()
         self.hijg = HIJG()
         self.higg = HIGG()
@@ -46,7 +48,9 @@ class StockLib():
 
         app.include_router(self.snowball.router,prefix="/snowball")
 
-        app.include_router(self.akshare.router,prefix="/ak")
+        app.include_router(self.ak_base.router,prefix="/ak")
+        app.include_router(self.ak_refresh.router,prefix="/ak")
+        app.include_router(self.ak_current.router,prefix="/ak")
 
 if __name__ == "__main__":
     import uvicorn
