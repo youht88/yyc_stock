@@ -44,6 +44,8 @@ def gen_content_html(data_table,state_table,fix_col_index=[]):
                 padding: 8px;
                 text-align: left;
             }}
+            {fix_columns_css} 
+
             th {{
                 position: sticky; /* 使表头固定 */
                 top: 0; /* 固定在顶部 */
@@ -52,12 +54,12 @@ def gen_content_html(data_table,state_table,fix_col_index=[]):
                 text-align: center;
                 cursor: pointer;
                 background-color: #f2f2f2;
+                z-index: 40;
             }}
             th:hover {{
                 background-color: #ddd;
             }}
             
-            {fix_columns_css} 
             tr:nth-child(even) {{
                 background-color: #f2f2f2; /* 偶数行背景色 */
             }}
@@ -75,12 +77,22 @@ def gen_content_html(data_table,state_table,fix_col_index=[]):
                 border-radius: 5px;
                 text-align: center;
             }}
+            .export-button {{
+                margin: 5px auto;
+                cursor: pointer;
+                padding: 5px 10px;
+                background-color: #1E90FF;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                text-align: center;
+            }}
         </style>
     </head>
     <body>
-        <h2>统计 <button id="export_state_btn" class="btn btn-primary mt-3">导出为 CSV</button> </h2>
+        <h2>统计 <button id="export_state_btn" class="export-button">导出为 CSV</button> </h2>
         {state_table}
-        <h2>数据 <button id="export_data_btn" class="btn btn-primary mt-3">导出为 CSV</button> </h2>
+        <h2>数据 <button id="export_data_btn" class="export-button">导出为 CSV</button> </h2>
         {data_table}
 
         <script>
