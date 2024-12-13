@@ -17,7 +17,7 @@ import concurrent.futures
 from fastapi import FastAPI, HTTPException,Request,Response,APIRouter
 import akshare as ak
 
-def gen_content_html(data_table,state_table,fix_col_index=[]):
+def gen_content_html(data_table,state_table,fix_col_index:list[int]=[]):
     if fix_col_index:
         fix_columns = ','.join([f'th:nth-child({idx}), td:nth-child({idx})' for idx in fix_col_index])
         fix_columns_css = fix_columns + ''' {
@@ -237,7 +237,7 @@ class StockBase:
                             df = df.filter(columns)
                         df.to_sql(table_name,index=False,if_exists="append",con=sqlite3.connect(db_name))
                 return results
-    def _get_codes(self,type:Literal['stock','zx','bk','akbk'],name):
+    def _get_codes(self,type:Literal['stock','zx','bk','akbk'],name)->list[str]:
         codes = []
         if type=='stock':
             codes_info = [self._get_stock_code(item) for item in name.split(',') if item]
@@ -252,7 +252,7 @@ class StockBase:
             codes_info = self._get_akbk_codes(name)
             codes = [item['dm'] for item in codes_info]
         return codes        
-    def _get_request_codes(self,req:Request):
+    def _get_request_codes(self,req:Request)->list[str]:
         stock = req.query_params.get('code')
         zx = req.query_params.get('zx')
         bk = req.query_params.get('bk')

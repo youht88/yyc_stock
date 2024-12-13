@@ -16,6 +16,8 @@ class StockLib():
         self.ak_base = AkshareBase()
         self.ak_refresh = AK_REFRESH()
         self.ak_current = AK_CURRENT()
+        self.ak_hist = AK_HIST()
+        self.ak_flow = AK_FLOW()
         self.hibk = HIBK()
         self.hijg = HIJG()
         self.higg = HIGG()
@@ -51,6 +53,8 @@ class StockLib():
         app.include_router(self.ak_base.router,prefix="/ak")
         app.include_router(self.ak_refresh.router,prefix="/ak")
         app.include_router(self.ak_current.router,prefix="/ak")
+        app.include_router(self.ak_hist.router,prefix="/ak")
+        app.include_router(self.ak_flow.router,prefix="/ak")
 
 if __name__ == "__main__":
     import uvicorn

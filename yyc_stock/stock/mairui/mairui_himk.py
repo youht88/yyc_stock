@@ -408,7 +408,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_jdzgzd()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
@@ -419,7 +419,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_pzxg()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
@@ -430,7 +430,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_cjzz()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
@@ -441,7 +441,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_pzxd()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
@@ -452,7 +452,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_cjzj()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
@@ -463,7 +463,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_lxfl()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
@@ -474,7 +474,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_lxsl()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
@@ -485,7 +485,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_lxsz()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
@@ -496,7 +496,7 @@ class HIMK(MairuiBase):
             try:
                 df = self.get_himk_lxxd()
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,columns=['dm','mc'])
+                content = self._to_html(df,fix_columns=['dm','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
