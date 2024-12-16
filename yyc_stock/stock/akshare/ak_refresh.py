@@ -551,6 +551,76 @@ class AK_REFRESH(AkshareBase):
                     error_code_info.append(f"{code}-{mc},{e}")
                 pbar.update(1)
         return error_code_info
+    
+    def cmf_refresh(self):
+        cmf_db=sqlite3.connect(f"cmf.db")
+        table = "cmf"
+        codes_info = self._get_bk_codes("hs_a")
+        #codes_info = codes_info[:10]
+        #codes_info=[{'dm':'300159','mc':'新研股份','jys':'sz'}]
+        print("total codes:",len(codes_info))
+        cmf_error_msg=""
+        if int(datetime.today().strftime("%H"))<16:
+            print("today=",datetime.today())
+            #raise Exception("请在当天交易结束后,16点后执行")
+        try:
+            cmf_db.execute(f"select * from {table} limit 1")
+        except Exception as e:
+            cmf_error_msg="no_cmf_db"
+
+        with tqdm(total=len(codes_info),desc="进度") as pbar:
+            error_code_info=[]                
+            date = datetime.today().strftime("%Y-%m-%d")
+            for code_info in codes_info:
+                code = code_info['dm']
+                mc = code_info['mc']
+                try:
+                    max_info_date=cmf_db.execute(f"select max_d from info where code='{code}'").fetchall()
+                    if max_info_date:
+                        max_info_date = max_info_date[0][0]
+                        info_error_msg=""
+                    else:
+                        max_info_date = None
+                        print("no_info_record-->",code,mc,"max_date=",max_info_date)
+                        info_error_msg = "no_info_record"
+                except:
+                    info_error_msg = "no_info_table"
+                    max_info_date = None
+                try:
+                    df=ak.stock_cyq_em(code)
+                    if not df.empty:
+                        df=df.rename(columns={'日期':'date','获利比例':'hlbl','平均成本':'pjcb','90成本-低':'cb90d','90成本-高':'cb90g','90集中度':'jzd90','70成本-低':'cb70d','70成本-高':'cb70g','70集中度':'jzd70'})
+                        df['code']=code
+                        df['mc']=mc
+                        df['date'] = pd.to_datetime(df['date'])
+                        max_cmf_date = df['date'].max().strftime('%Y-%m-%d')
+                        if max_info_date:
+                            df = df[df['date'] > max_info_date]
+                        df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+                        if not df.empty:
+                            if cmf_error_msg=="no_cmf_db":
+                                cmf_error_msg=""
+                                print("no such table [cmf]")
+                                df.to_sql(table,if_exists="replace",index=False,con=cmf_db)
+                                cmf_db.execute("create unique index index_cmf on cmf(code,date)")
+                                cmf_db.execute("create table info(code TEXT,max_d TEXT)")
+                                cmf_db.execute("create unique index info_index on info(code)")
+                                cmf_db.execute(f"insert into info values('{code}','{max_cmf_date}')")
+                            elif info_error_msg=="no_info_record":
+                                info_error_msg=""
+                                cmf_db.execute(f"insert into info values('{code}','{max_cmf_date}')")
+                                cmf_db.commit()
+                                df.to_sql(table,if_exists="append",index=False,con=cmf_db)
+                            else:
+                                cmf_db.execute(f"update into info values('{code}','{max_cmf_date}')")
+                                cmf_db.commit()
+                                df.to_sql(table,if_exists="append",index=False,con=cmf_db)
+                    else:
+                        print(f"no data on {code}-{mc}")
+                except Exception as e:
+                    error_code_info.append(f"{code}-{mc},{e}")
+                pbar.update(1)
+        return error_code_info
 
     def register_router(self):
         @self.router.get("/refresh/bk")
@@ -563,7 +633,14 @@ class AK_REFRESH(AkshareBase):
                 return self.bk_refresh()
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
-
+        @self.router.get("/refresh/cmf")
+        async def _refresh_cmf(req:Request):
+            """更新筹码峰信息"""
+            try:
+                return self.cmf_refresh()
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+        
         @self.router.get("/refresh/daily")
         async def _refresh_refresh(req:Request):
             """更新日线数据"""
