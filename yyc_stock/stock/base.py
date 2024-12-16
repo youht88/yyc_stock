@@ -538,7 +538,12 @@ class StockBase:
         condition = [item for item in req.query_params.items() if '@' in item[0]]
         order = req.query_params.get('o')
         limit = int(req.query_params.get('n',0))
+        add_cols = req.query_params.get('a')
+        groupby = req.query_params.get('g')
         number_pattern = r'^-?\d*\.?\d+$'
+        if add_cols:
+            print("add cols=",add_cols)
+            df = self._parse_add_express(df,add_cols) 
         if condition:
             for item in condition:
                 key = item[0].replace('@','')
@@ -638,52 +643,86 @@ class StockBase:
                                 print(f"{key} contains {value}")
                                 filter = filter | df[key].str.contains(value)
                         df = df[filter]
+        if groupby:
+            print("groupby=",groupby)
+            df = self._parse_groupby_express(df,groupby) 
         if order:
+            print("order=",order)
             df = self._parse_order_express(df,order) 
         if limit:
             df = df.head(limit)
         return df
+    def _parse_groupby_express(self,df:pd.DataFrame,groupby:str)->pd.DataFrame:
+        # g=code,c;p:sum,z:avg
+        #df.groupby(['tt','p','vt'])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+        try:
+            temp = groupby.split(';')
+            groupby = temp[0].split(',')
+            kvs = temp[1].split(',')
+            #keys = [ item.split(':')[0] for item in kvs]
+            aggs = { item.split(':')[0]:item.split(':')[1] for item in kvs}
+            if groupby and aggs:        
+                df = df.groupby(by=groupby).agg(aggs).reset_index()
+            return df
+        except Exception as e:
+            raise Exception(f"groupby express error:{e}")
+    def _parse_add_express(self,df:pd.DataFrame,add_cols:str)->pd.DataFrame:
+        # a=x:c*c1;y=c-c1
+        try:
+            add_col_parts = [item for item in add_cols.split(';')]
+            for add_col in add_col_parts:
+                item = add_col.split(':')
+                key = item[0]
+                value=item[1]
+                df[key] = df.eval(value)         
+            return df
+        except Exception as e:
+            raise Exception(f"add column express error:{e}")
     def _parse_order_express(self,df:pd.DataFrame,order:str)->pd.DataFrame:
-        express = re.findall(r'(add|sub|mul|div|avg)\((.*)\)',order)
-        if not express:
-            express=[order]
-        else:
-            express = [express[0][0]] + express[0][1].split(',')
-        number_pattern = r'^-?\d*\.?\d+$'
-        if express[0]=='add' and len(express)>1:
-            order = "_order"
-            args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
-            df["_order"] = args[0]
-            for item in args[1:]:
-                df["_order"] = df["_order"] + item
-        elif express[0]=='sub' and len(express)==3:
-            order = "_order"
-            args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
-            df["_order"] = args[0] - args[1]
-        elif express[0]=='mul' and len(express)>1:
-            order = "_order"
-            args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
-            df["_order"] = args[0]
-            for item in args[1:]:
-                df["_order"] = df["_order"] * item
-        elif express[0]=='div' and len(express)==3:
-            order = "_order"
-            args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
-            df["_order"] = args[0] / args[1]
-        elif express[0]=='avg' and len(express)>1:
-            order = "_order"
-            args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
-            df["_order"] = args[0]
-            for item in args[1:]:
-                df["_order"] = df["_order"] + item
-            df["_order"] = df["_order"]/len(args)
-        elif len(express)==1:
-            order="_order"
-            df['_order'] = df.eval(express[0])            
-        else:
-            raise Exception(f"{order}表达式不正确")
-        df = df.sort_values(by=order,ascending=False)
-        return df
+        try:
+            express = re.findall(r'(add|sub|mul|div|avg)\((.*)\)',order)
+            if not express:
+                express=[order]
+            else:
+                express = [express[0][0]] + express[0][1].split(',')
+            number_pattern = r'^-?\d*\.?\d+$'
+            if express[0]=='add' and len(express)>1:
+                order = "_order"
+                args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
+                df["_order"] = args[0]
+                for item in args[1:]:
+                    df["_order"] = df["_order"] + item
+            elif express[0]=='sub' and len(express)==3:
+                order = "_order"
+                args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
+                df["_order"] = args[0] - args[1]
+            elif express[0]=='mul' and len(express)>1:
+                order = "_order"
+                args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
+                df["_order"] = args[0]
+                for item in args[1:]:
+                    df["_order"] = df["_order"] * item
+            elif express[0]=='div' and len(express)==3:
+                order = "_order"
+                args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
+                df["_order"] = args[0] / args[1]
+            elif express[0]=='avg' and len(express)>1:
+                order = "_order"
+                args = [float(arg) if re.match(number_pattern,arg) else df[arg] for arg in express[1:]]
+                df["_order"] = args[0]
+                for item in args[1:]:
+                    df["_order"] = df["_order"] + item
+                df["_order"] = df["_order"]/len(args)
+            elif len(express)==1:
+                order="_order"
+                df['_order'] = df.eval(express[0])            
+            else:
+                raise Exception(f"{order}表达式不正确")
+            df = df.sort_values(by=order,ascending=False)
+            return df
+        except Exception as e:
+            raise Exception(f"order express error:{e}")
+
     def _to_html(self,df:pd.DataFrame,columns:list[str]=None,formats:str=None,fix_columns:list[str]=[]):
         df_state = df.describe()
         df_state.loc['sum']=df[df.select_dtypes(include=['int', 'float']).columns].sum()
