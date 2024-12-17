@@ -33,7 +33,7 @@ def gen_content_html(data_table,state_table,fix_col_index:list[int]=[]):
     <!DOCTYPE html>
     <html>
     <head>
-        <title>Sortable Table</title>
+        <title>DataFrame Table</title>
         <style>
             table {{
                 border-collapse: collapse;
@@ -535,20 +535,38 @@ class StockBase:
                 raise Exception(f"查找{stock_name}代码信息出错,{e}")
 
     def _prepare_df(self,df:pd.DataFrame,req:Request):
-        condition = [item for item in req.query_params.items() if '@' in item[0]]
+        where = [(item[0][1:],item[1]) for item in req.query_params.items() if item[0].startswith('@')]
+        having = [(item[0][1:],item[1]) for item in req.query_params.items() if item[0].startswith('$')]
         order = req.query_params.get('o')
         limit = int(req.query_params.get('n',0))
         add_cols = req.query_params.get('a')
         groupby = req.query_params.get('g')
-        number_pattern = r'^-?\d*\.?\d+$'
         if add_cols:
             print("add cols=",add_cols)
             df = self._parse_add_express(df,add_cols) 
-        if condition:
+        if where:
+            print("where=",where)
+            df = self._parse_condition_express(df,where)
+        if groupby:
+            print("groupby=",groupby)
+            df = self._parse_groupby_express(df,groupby) 
+        if having:
+            print("having=",having)
+            df = self._parse_condition_express(df,having) 
+        if order:
+            print("order=",order)
+            df = self._parse_order_express(df,order) 
+        if limit:
+            df = df.head(limit)
+        return df
+    def _parse_condition_express(self,df:pd.DataFrame,condition:list[tuple[str,str]])->pd.DataFrame:
+        try:
+            number_pattern = r'^-?\d*\.?\d+$'
             for item in condition:
-                key = item[0].replace('@','')
-                if '[' in item[1] and ']' in item[1]:
-                    values = item[1].replace('[','').replace(']','').split(',')[:2]
+                key = item[0]
+                value = item[1]
+                values = value.replace('[','').replace(']','').split(',')[:2]
+                if len(values)>1:
                     keys = key.split('.')
                     key = keys[0]
                     key_func = keys[1] if len(keys)>1 else None 
@@ -643,29 +661,24 @@ class StockBase:
                                 print(f"{key} contains {value}")
                                 filter = filter | df[key].str.contains(value)
                         df = df[filter]
-        if groupby:
-            print("groupby=",groupby)
-            df = self._parse_groupby_express(df,groupby) 
-        if order:
-            print("order=",order)
-            df = self._parse_order_express(df,order) 
-        if limit:
-            df = df.head(limit)
-        return df
+            return df
+        except Exception as e:
+            raise Exception(f"condition express is error:{e}") 
+
     def _parse_groupby_express(self,df:pd.DataFrame,groupby:str)->pd.DataFrame:
         # g=code,c;p:sum,z:avg
         #df.groupby(['tt','p','vt'])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
         try:
             temp = groupby.split(';')
-            groupby = temp[0].split(',')
+            groupby_list = temp[0].split(',')
             kvs = temp[1].split(',')
             #keys = [ item.split(':')[0] for item in kvs]
             aggs = { item.split(':')[0]:item.split(':')[1] for item in kvs}
-            if groupby and aggs:        
-                df = df.groupby(by=groupby).agg(aggs).reset_index()
+            if groupby_list and aggs:        
+                df = df.groupby(by=groupby_list).agg(aggs).reset_index()
             return df
         except Exception as e:
-            raise Exception(f"groupby express error:{e}")
+            raise Exception(f"groupby express example `code,mc;price:sum,zf:mean,...` ,but `{groupby}` is error:{e}")
     def _parse_add_express(self,df:pd.DataFrame,add_cols:str)->pd.DataFrame:
         # a=x:c*c1;y=c-c1
         try:
@@ -677,7 +690,7 @@ class StockBase:
                 df[key] = df.eval(value)         
             return df
         except Exception as e:
-            raise Exception(f"add column express error:{e}")
+            raise Exception(f"add column express example `x:a*b;y:(a+b)/2;...` ,but `{add_cols}` is error:{e}")
     def _parse_order_express(self,df:pd.DataFrame,order:str)->pd.DataFrame:
         try:
             express = re.findall(r'(add|sub|mul|div|avg)\((.*)\)',order)

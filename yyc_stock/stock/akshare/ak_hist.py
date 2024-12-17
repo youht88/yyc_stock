@@ -18,10 +18,27 @@ class AK_HIST(AkshareBase):
     def hist_daily_pro(self,codes,sdate):
         df = pd.DataFrame()
         code_list = ','.join(codes)
-        df = self._get_df_source(db_name="daily_pro.db",sql=f"select * from daily where code in ({code_list}) and d > '{sdate}'")
+        df = self._get_df_source(db_name="daily_pro.db",sql=f"select * from daily where code in ({code_list}) and date > '{sdate}'")
         #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
         return df
-    
+    def hist_cmf(self,codes,sdate):
+        df = pd.DataFrame()
+        code_list = ','.join(codes)
+        df = self._get_df_source(db_name="cmf.db",sql=f"select * from cmf where code in ({code_list}) and date > '{sdate}'")
+        #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
+        return df
+    def hist_zf(self,code,sdate=None,zf=5):
+        # 查找股票sdate之前振幅超过5,且(最高价>=当前最高价，或最低价<=当前最低价)的最近日期
+        today = datetime.today().strftime('%Y-%m-%d')
+        sdate = sdate if sdate else today
+        code = self._get_codes('stock',code)[0]
+        df = self._get_df_source(db_name="daily_pro.db",sql=f"select * from daily where code = '{code}' and date<='{sdate}'")
+        df.date = pd.to_datetime(df.date)
+        current = df.loc[df['date'].dt.strftime('%Y-%m-%d')==sdate]
+        max_date = df.loc[(df['date']<sdate) & (df['zf'] > 5) & ((df['h']>=current.h.values[0]) | (df['l']<=current.l.values[0])), 'date']
+        print(max_date)
+        # return max_date
+        return df
     def register_router(self):
         @self.router.get("/hist/daily_pro")
         async def _hist_daily_pro(req:Request):
@@ -37,6 +54,36 @@ class AK_HIST(AkshareBase):
                 if not formats:
                     formats =  'zd:0,0;e:100000000,100000000'
                 content = self._to_html(df,formats=formats,fix_columns=['code','mc'])
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/hist/cmf")
+        async def _hist_cmf(req:Request):
+            """获取历史筹码峰数据"""
+            try:
+                codes = self._get_request_codes(req)
+                sdate = req.query_params.get('sdate')
+                if not sdate:
+                    sdate = '2024-01-01'
+                df = self.hist_cmf(codes,sdate)
+                df['date'] = pd.to_datetime(df['date'])
+                df = self._prepare_df(df,req)
+                formats = req.query_params.get('f')
+                if not formats:
+                    formats =  'zd:0,0;e:100000000,100000000'
+                content = self._to_html(df,formats=formats,fix_columns=['code','mc'])
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/hist/zf/{code}/{sdate}/{zf}")
+        async def _hist_zf(code:str,sdate:str,zf:int,req:Request):
+            try:
+                #codes = self._get_request_codes(req)
+                #sdate = req.query_params.get('sdate')
+                df = self.hist_zf(code,sdate,zf)
+                df['date'] = pd.to_datetime(df['date'])
+                df = self._prepare_df(df,req)
+                content = self._to_html(df,fix_columns=['code','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")

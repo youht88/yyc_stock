@@ -44,65 +44,14 @@ class AK_REFRESH(AkshareBase):
                 pbar.update(1) 
         return {"message":"ok"}
     
-    def daily_refresh(self,sdate='20220101'):
-        daily_db=sqlite3.connect("daily.db")
-        codes_info = self._get_bk_codes("hs_a")
-        print("total codes:",len(codes_info))
-        error_code_info=[]
-        error_msg=""
-        
-        with tqdm(total=len(codes_info)) as pbar:
-            try:
-                for code_info in codes_info:
-                    code = code_info['dm']
-                    mc = code_info['mc']
-                    today = datetime.today().strftime("%Y%m%d")
-                    new_sdate = sdate
-                    try:
-                        try:
-                            max_date=daily_db.execute(f"select max(d) from daily where code='{code}'").fetchall()[0][0]
-                            if max_date:
-                                max_date = datetime.strptime(max_date,"%Y-%m-%d %H:%M:%S") 
-                                start_date = datetime.strptime(sdate,"%Y%m%d")
-                                if max_date >= start_date:
-                                    new_sdate = datetime.strftime(max_date + timedelta(days=1),"%Y%m%d")
-                        except Exception as e:
-                            print(code,mc,e)
-                            error_msg="no_such_table"
-                        finally:
-                            if new_sdate<=today:
-                                df=ak.stock_zh_a_hist(code,start_date=new_sdate)
-                                if not df.empty:
-                                    df=df.rename(columns={'日期':'d','股票代码':'code','开盘':'o','最高':'h','最低':'l','收盘':'c','成交量':'v','成交额':'e','振幅':'zf','涨跌幅':'zd','涨跌额':'zde','换手率':'hs'})
-                                    df['mc']=mc
-                                    df['d'] = pd.to_datetime(df['d'],format='%Y-%m-%d')
-                                    if error_msg=="no_such_table":
-                                        error_msg=""
-                                        df.to_sql("daily",if_exists="replace",index=False,con=daily_db)
-                                        daily_db.execute("create unique index daily_index on daily(code,d)")
-                                    else:
-                                        df.to_sql("daily",if_exists="append",index=False,con=daily_db)
-                                else:
-                                    print(f"no data begin of  {new_sdate} on {code}-{mc}")
-                            else:
-                                print(f"no need fetch {new_sdate} of {code}-{mc}")
-                    except Exception as e:
-                        error_code_info.append(f"{code}-{mc},{e}")
-                    pbar.update(1)
-            except KeyboardInterrupt:
-                pbar.close()
-                raise Exception("任务中断!!")
-        return error_code_info
-
     def daily_pro(self):
-        daily_db=sqlite3.connect("daily.db")
         daily_pro_db=sqlite3.connect("daily_pro.db")
         table = "daily"
         codes_info = self._get_bk_codes("hs_a")
-        #codes_info = codes_info[:100]
+        #codes_info = codes_info[:10]
         #codes_info=[{'dm':'300159','mc':'新研股份'}]
         print("total codes:",len(codes_info))
-        flow_cols={'日期': 'd', '主力净流入-净额': 'zljlr', '主力净流入-净占比': 'zljlrl', 
+        flow_cols={'日期': 'date', '主力净流入-净额': 'zljlr', '主力净流入-净占比': 'zljlrl', 
                               '超大单净流入-净额': 'cddjlr', '超大单净流入-净占比': 'cddjlrl', '大单净流入-净额': 'ddjlr', '大单净流入-净占比': 'ddjlrl',
                               '中单净流入-净额': 'zdjlr', '中单净流入-净占比': 'zdjlrl', '小单净流入-净额': 'xdjlr', '小单净流入-净占比': 'xdjlrl'}
                     
@@ -111,11 +60,7 @@ class AK_REFRESH(AkshareBase):
             error_code_info=[]
             error_msg=""
             sdate = '2024-01-01'
-            try:
-                total_max_date = daily_db.execute(f"select max(d) from {table}").fetchall()[0][0][:10]
-                print(f"total_max_date on daily.db is {total_max_date}")
-            except:
-                raise Exception('没有找到daily.db，请先访问/ak/daily/refresh重新生成!')
+            today = datetime.today().strftime('%Y-%m-%d')
             for code_info in codes_info:
                 code = code_info['dm']
                 mc = code_info['mc']
@@ -126,7 +71,7 @@ class AK_REFRESH(AkshareBase):
                     max_date=daily_pro_db.execute(f"select max_d from info where code='{code}'").fetchall()
                     if max_date:
                         max_date = max_date[0][0]
-                        if max_date>=total_max_date:
+                        if max_date>=today:
                             pbar.update(1)
                             continue   
                         d_max_date = datetime.strptime(max_date,"%Y-%m-%d") 
@@ -140,23 +85,28 @@ class AK_REFRESH(AkshareBase):
                     print("no_daily_table-->",code,mc,"max_date=",max_date,"sdate=",sdate,"error=",e)
                     error_msg="no_daily_table"
                 try:
-                    origin_df = pd.read_sql(f"select * from {table} where code='{code}' and d >= '{new_sdate}'",daily_db)
+                    #origin_df = pd.read_sql(f"select * from {table} where code='{code}' and d >= '{new_sdate}'",daily_db)
+                    origin_df = ak.stock_zh_a_hist(code,start_date=new_sdate.replace('-',''))
+                    origin_df=origin_df.rename(columns={'日期':'date','股票代码':'code','开盘':'o','最高':'h','最低':'l','收盘':'c','成交量':'v','成交额':'e','振幅':'zf','涨跌幅':'zd','涨跌额':'zde','换手率':'hs'})
+                    origin_df['code']=code
+                    origin_df['mc'] = mc
+                    origin_df['jys'] = jys
                     if origin_df.empty:
                         print(f"{code}-{mc} > new_sdate={new_sdate},没有找到该数据!")
                         pbar.update(1)
                         continue 
-                    if max_date and max_date >= origin_df['d'].iloc[-1]:
+                    if max_date and max_date >= origin_df['date'].iloc[-1]:
                         print(f"{code}-{mc},no deed because of data exists!")
                         pbar.update(1)
                         continue 
                     df = origin_df.reset_index() 
-                    df.d = pd.to_datetime(df.d)
+                    df.date = pd.to_datetime(df.date)
                     
                     df_flow = ak.stock_individual_fund_flow(code, market=jys)
                     df_flow = df_flow.rename(columns=flow_cols).drop(columns=["收盘价","涨跌幅"])
-                    df_flow.d = pd.to_datetime(df_flow.d)
+                    df_flow.date = pd.to_datetime(df_flow.date)
                     
-                    df = pd.merge(df,df_flow,on='d',how="left")
+                    df = pd.merge(df,df_flow,on='date',how="left")
                     df_add_cols={}
                     # 后15天涨跌幅
                     for col in ['zd']:
@@ -267,8 +217,9 @@ class AK_REFRESH(AkshareBase):
                             df.at[i, key] = count
                     if max_date:
                         new_sdate = datetime.strftime(d_max_date + timedelta(days=1),"%Y-%m-%d")
-                        df = df[df['d']>=new_sdate]
-                    info_max_date = df.iloc[-1]['d'].strftime("%Y-%m-%d")
+                        df = df[df['date']>=new_sdate]
+                    info_max_date = df.iloc[-1]['date'].strftime("%Y-%m-%d")
+                    df['date'] = df['date'].dt.strftime('%Y-%m-%d')
                     if error_msg=="no_daily_table":
                         error_msg=""
                         print("create daily & info table ->",code,info_max_date)
@@ -276,7 +227,7 @@ class AK_REFRESH(AkshareBase):
                         daily_pro_db.execute("create unique index info_index on info(code)")
                         daily_pro_db.execute(f"insert into info values('{code}','{info_max_date}')")
                         df.to_sql("daily",if_exists="replace",index=False,con=daily_pro_db)
-                        daily_pro_db.execute("create unique index daily_index on daily(code,d)")
+                        daily_pro_db.execute("create unique index daily_index on daily(code,date)")
                     elif error_msg=="no_info_table":
                         error_msg=""
                         print("insert info ->",code,info_max_date)
@@ -560,9 +511,10 @@ class AK_REFRESH(AkshareBase):
         #codes_info=[{'dm':'300159','mc':'新研股份','jys':'sz'}]
         print("total codes:",len(codes_info))
         cmf_error_msg=""
+        today=datetime.today().strftime("%Y-%m-%d")
         if int(datetime.today().strftime("%H"))<16:
             print("today=",datetime.today())
-            #raise Exception("请在当天交易结束后,16点后执行")
+            raise Exception("请在当天交易结束后,16点后执行")
         try:
             cmf_db.execute(f"select * from {table} limit 1")
         except Exception as e:
@@ -570,7 +522,6 @@ class AK_REFRESH(AkshareBase):
 
         with tqdm(total=len(codes_info),desc="进度") as pbar:
             error_code_info=[]                
-            date = datetime.today().strftime("%Y-%m-%d")
             for code_info in codes_info:
                 code = code_info['dm']
                 mc = code_info['mc']
@@ -579,6 +530,9 @@ class AK_REFRESH(AkshareBase):
                     if max_info_date:
                         max_info_date = max_info_date[0][0]
                         info_error_msg=""
+                        if max_info_date >= today:
+                            pbar.update(1)
+                            continue
                     else:
                         max_info_date = None
                         print("no_info_record-->",code,mc,"max_date=",max_info_date)
@@ -641,17 +595,6 @@ class AK_REFRESH(AkshareBase):
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
         
-        @self.router.get("/refresh/daily")
-        async def _refresh_refresh(req:Request):
-            """更新日线数据"""
-            sdate = req.query_params.get('sdate')
-            error_code_info=[]
-            if sdate:
-                sdate=sdate.replace('-','')
-                error_code_info=self.daily_refresh(sdate)
-            else:
-                error_code_info=self.daily_refresh()
-            return {"message":f"daily refresh已完成,error_code_info={error_code_info}"}
         @self.router.get("/refresh/daily_pro")
         async def _refresh_daily_pro(req:Request):
             """更新日线增强数据"""
