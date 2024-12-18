@@ -132,11 +132,19 @@ class AK_REFRESH(AkshareBase):
                     df_add_cols['kl'] = _kdj_df.kl
                     df_add_cols['dl'] = _kdj_df.dl
                     df_add_cols['jl'] = _kdj_df.jl
+                    _sz_kdj_df = self._kdj(df.szc,df.szl,df.szh,9,3,3)
+                    df_add_cols['szkl'] = _sz_kdj_df.kl
+                    df_add_cols['szdl'] = _sz_kdj_df.dl
+                    df_add_cols['szjl'] = _sz_kdj_df.jl
                     # macd指标
                     _macd_df = self._macd(df.c,12,26,9)
                     df_add_cols['dif'] = _macd_df.dif
                     df_add_cols['dea'] = _macd_df.dea
                     df_add_cols['macd'] = _macd_df.macd
+                    _sz_macd_df = self._macd(df.szc,12,26,9)
+                    df_add_cols['szdif'] = _sz_macd_df.dif
+                    df_add_cols['szdea'] = _sz_macd_df.dea
+                    df_add_cols['szmacd'] = _sz_macd_df.macd
                     # 当日股价高低位置
                     status_df= pd.Series(['N']*len(df))
                     high=df['c'].rolling(window=120).apply(lambda x:x.quantile(0.9))
@@ -153,7 +161,7 @@ class AK_REFRESH(AkshareBase):
                     df_add_cols['v_status'] = status_df
                                         
                     # 近5,10,20,60,120交易日平均关键指标                    
-                    for col in ['c','v','e','hs','zf']:
+                    for col in ['c','v','e','hs','zf','szc']:
                         for idx in [5,10,20,40,60,120]:
                             df_add_cols[f'ma{idx}{col}']=df[col].rolling(window=idx).apply(lambda x:x.mean())        
                     
@@ -180,7 +188,8 @@ class AK_REFRESH(AkshareBase):
                     df_cols = pd.concat(list(df_add_cols.values()), axis=1, keys=list(df_add_cols.keys()))
                     df = pd.concat([df,df_cols],axis=1)
                     # 之前的kdj、macd、ma
-                    fields={'kl','dl','jl','dif','dea','macd','ma5c','ma10c','ma20c'}
+                    fields={'kl','dl','jl','dif','dea','macd','ma5c','ma10c','ma20c',
+                            'szkl','szdl','szjl','szdif','szdea','szmacd','ma5szc','ma10szc','ma20szc'}
                     for key in fields:
                         df[f"{key}1"]=df[f"{key}"].shift(1)
                         df[f"{key}2"]=df[f"{key}"].shift(2)
