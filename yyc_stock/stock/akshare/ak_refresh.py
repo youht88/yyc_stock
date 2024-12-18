@@ -14,7 +14,7 @@ class AK_REFRESH(AkshareBase):
     def __init__(self):
         super().__init__()
         self.register_router()
-    def bk_refresh(self):
+    def akbk_refresh(self):
         # 清除代码库
         con=sqlite3.connect(self.stock_db_name)
         try:
@@ -48,13 +48,20 @@ class AK_REFRESH(AkshareBase):
         daily_pro_db=sqlite3.connect("daily_pro.db")
         table = "daily"
         codes_info = self._get_bk_codes("hs_a")
-        #codes_info = codes_info[:10]
+        #codes_info = codes_info[:1]
         #codes_info=[{'dm':'300159','mc':'新研股份'}]
         print("total codes:",len(codes_info))
         flow_cols={'日期': 'date', '主力净流入-净额': 'zljlr', '主力净流入-净占比': 'zljlrl', 
                               '超大单净流入-净额': 'cddjlr', '超大单净流入-净占比': 'cddjlrl', '大单净流入-净额': 'ddjlr', '大单净流入-净占比': 'ddjlrl',
                               '中单净流入-净额': 'zdjlr', '中单净流入-净占比': 'zdjlrl', '小单净流入-净额': 'xdjlr', '小单净流入-净占比': 'xdjlrl'}
-                    
+        cmf_cols={'日期':'date','获利比例':'hlbl','平均成本':'pjcb','90成本-低':'cb90d','90成本-高':'cb90g','90集中度':'jzd90',
+                  '70成本-低':'cb70d','70成本-高':'cb70g','70集中度':'jzd70'}
+        szindex_cols={'日期':'date','开盘':'szo','收盘':'szc','最高':'szh','最低':'szl','成交量':'szv','成交额':'sze','振幅':'szzf','涨跌幅':'szzd','涨跌额':'szzde','换手率':'szhs'}            
+
+        df_szindex = ak.index_zh_a_hist('000001')
+        df_szindex = df_szindex.rename(columns=szindex_cols)
+        df_szindex.date = pd.to_datetime(df_szindex.date)            
+        
         with tqdm(total=len(codes_info),desc="进度") as pbar:
             days=15
             error_code_info=[]
@@ -104,9 +111,16 @@ class AK_REFRESH(AkshareBase):
                     
                     df_flow = ak.stock_individual_fund_flow(code, market=jys)
                     df_flow = df_flow.rename(columns=flow_cols).drop(columns=["收盘价","涨跌幅"])
-                    df_flow.date = pd.to_datetime(df_flow.date)
-                    
+                    df_flow.date = pd.to_datetime(df_flow.date)            
                     df = pd.merge(df,df_flow,on='date',how="left")
+
+                    df_cmf = ak.stock_cyq_em(code)
+                    df_cmf = df_cmf.rename(columns=cmf_cols)
+                    df_cmf.date = pd.to_datetime(df_cmf.date)            
+                    df = pd.merge(df,df_cmf,on='date',how="left")
+                    
+                    df = pd.merge(df,df_szindex,on='date',how="left")
+                    
                     df_add_cols={}
                     # 后15天涨跌幅
                     for col in ['zd']:
@@ -158,7 +172,7 @@ class AK_REFRESH(AkshareBase):
                             df_add_cols[f'pct{idx+1}{col}'] = df[col].pct_change(idx) * 100 
                     
                     # 前15天关键指标          
-                    for col in ['o','c','h','l','zd','v','e','hs','zf','zljlr','zljlrl','cddjlrl','ddjlrl','zdjlrl','xdjlrl']:
+                    for col in ['o','c','h','l','zd','v','e','hs','zf','zljlr','zljlrl','hlbl','pjcb','jzd90','jzd70','szc','szzd','szv']:
                         for idx in range(days):
                             t=idx+1
                             df_add_cols[f'{col}{t}']=df[col].shift(t)
@@ -173,7 +187,7 @@ class AK_REFRESH(AkshareBase):
                     # 连续上涨、下跌天数,正负数表示
                     # 连续缩放量天数,正负数表示
                     # 连续涨跌停天数,正负数表示
-                    fields={'lxzd':'c','lxsf':'v','lxzdt':'zd','lxzljlr':'zljlr'}
+                    fields={'lxzd':'c','lxsf':'v','lxzdt':'zd','lxzljlr':'zljlr','lxszzd':'szzd','lxszsf':'szv'}
                     for key in fields:
                         df[key] = 0
                         for i in range(len(df)):
@@ -577,14 +591,14 @@ class AK_REFRESH(AkshareBase):
         return error_code_info
 
     def register_router(self):
-        @self.router.get("/refresh/bk")
-        async def _refresh_bk(req:Request):
+        @self.router.get("/refresh/akbk")
+        async def _refresh_akbk(req:Request):
             """分析连续下跌信息"""
             try:
                 #return self._get_akbk_code_info('BK0695')
                 #return self._get_akbk_codes('BK1027')
                 #return self._get_bk_codes('chgn_700129')
-                return self.bk_refresh()
+                return self.akbk_refresh()
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
         @self.router.get("/refresh/cmf")

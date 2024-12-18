@@ -18,13 +18,14 @@ class AK_HIST(AkshareBase):
     def hist_daily_pro(self,codes,sdate):
         df = pd.DataFrame()
         code_list = ','.join(codes)
-        df = self._get_df_source(db_name="daily_pro.db",sql=f"select * from daily where code in ({code_list}) and date > '{sdate}'")
+        sql = f"select * from daily where code in ({code_list}) and date >= '{sdate}'"
+        df = self._get_df_source(db_name="daily_pro.db",sql=sql)
         #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
         return df
     def hist_cmf(self,codes,sdate):
         df = pd.DataFrame()
         code_list = ','.join(codes)
-        df = self._get_df_source(db_name="cmf.db",sql=f"select * from cmf where code in ({code_list}) and date > '{sdate}'")
+        df = self._get_df_source(db_name="cmf.db",sql=f"select * from cmf where code in ({code_list}) and date >= '{sdate}'")
         #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
         return df
     def hist_zf(self,code,sdate=None,zf=5):

@@ -349,11 +349,13 @@ class StockBase:
                     df['jys']= df['dm'].apply(lambda x:'sh' if x.startswith('6') else 
                                                        'sz' if x.startswith('0') or x.startswith('3') else 
                                                        'bj' if x.startswith('8') else '' )
+                    df['type'] = type
+                    df['bkmc'] = name
                     data = df.to_dict(orient='records')
                     df['bk'] = code
                     try:
                         df.to_sql("akbk_codes",index=False,if_exists="append",con=con)
-                        con.execute("create unique index akbk_codes_index on akbk_codes(bk,dm)")
+                        con.execute("create unique index IF NOT EXISTS akbk_codes_index on akbk_codes(bk,dm)")
                     except:
                         pass
                     self.bk_codes[code]=data
@@ -737,6 +739,9 @@ class StockBase:
             raise Exception(f"order express error:{e}")
 
     def _to_html(self,df:pd.DataFrame,columns:list[str]=None,formats:str=None,fix_columns:list[str]=[]):
+        datetime_cols = df.select_dtypes(include=['datetime']).columns.to_list()
+        number_cols= df.select_dtypes(include=['int','float']).columns.to_list()
+        str_cols= df.select_dtypes(include=['object']).columns.to_list()
         df_state = df.describe()
         df_state.loc['sum']=df[df.select_dtypes(include=['int', 'float']).columns].sum()
         state_table = df_state.to_html(table_id='state_table')
@@ -752,6 +757,12 @@ class StockBase:
         data_table = df.to_html(table_id='data_table',index=False,escape=False,columns=columns,formatters=formaters)
         columns = df.columns.to_list()
         fix_col_index = list(filter(lambda x:x!=-1,[ columns.index(col)+1 if col in columns else -1 for col in fix_columns]))
+        datetime_col_index = list(filter(lambda x:x!=-1,[ columns.index(col)+1 if col in columns else -1 for col in datetime_cols]))
+        number_col_index = list(filter(lambda x:x!=-1,[ columns.index(col)+1 if col in columns else -1 for col in number_cols]))
+        str_col_index = list(filter(lambda x:x!=-1,[ columns.index(col)+1 if col in columns else -1 for col in str_cols]))
+        # print("datetime_cols:",datetime_col_index)
+        # print("number_cols:",number_col_index)
+        # print("str_cols:",str_col_index)
         content_html = gen_content_html(data_table,state_table,fix_col_index=fix_col_index)        
         return content_html
     
