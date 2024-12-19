@@ -22,10 +22,11 @@ class AK_HIST(AkshareBase):
         df = self._get_df_source(db_name="daily_pro.db",sql=sql)
         #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
         return df
-    def hist_cmf(self,codes,sdate):
+    def hist_price(self,codes,sdate):
         df = pd.DataFrame()
         code_list = ','.join(codes)
-        df = self._get_df_source(db_name="cmf.db",sql=f"select * from cmf where code in ({code_list}) and date >= '{sdate}'")
+        print(code_list,sdate)
+        df = self._get_df_source(db_name="price.db",sql=f"select * from price where code in ({code_list}) and date >= '{sdate}'")
         #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
         return df
     def hist_zf(self,code,sdate=None,zf=5):
@@ -58,21 +59,18 @@ class AK_HIST(AkshareBase):
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
-        @self.router.get("/hist/cmf")
-        async def _hist_cmf(req:Request):
-            """获取历史筹码峰数据"""
+        @self.router.get("/hist/price")
+        async def _hist_price(req:Request):
+            """获取历史交易统计数据"""
             try:
                 codes = self._get_request_codes(req)
                 sdate = req.query_params.get('sdate')
                 if not sdate:
                     sdate = '2024-01-01'
-                df = self.hist_cmf(codes,sdate)
+                df = self.hist_price(codes,sdate)
                 df['date'] = pd.to_datetime(df['date'])
                 df = self._prepare_df(df,req)
-                formats = req.query_params.get('f')
-                if not formats:
-                    formats =  'zd:0,0;e:100000000,100000000'
-                content = self._to_html(df,formats=formats,fix_columns=['code','mc'])
+                content = self._to_html(df,fix_columns=['code','mc'])
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")

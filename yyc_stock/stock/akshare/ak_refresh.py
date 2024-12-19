@@ -146,14 +146,14 @@ class AK_REFRESH(AkshareBase):
                     df_add_cols['szdea'] = _sz_macd_df.dea
                     df_add_cols['szmacd'] = _sz_macd_df.macd
                     # 当日股价高低位置
-                    status_df= pd.Series(['N']*len(df))
+                    status_df= pd.Series(['M']*len(df))
                     high=df['c'].rolling(window=120).apply(lambda x:x.quantile(0.9))
                     low=df['c'].rolling(window=120).apply(lambda x:x.quantile(0.1))
-                    status_df.loc[df['c'] > high] = 'H'
-                    status_df.loc[df['c'] < low] = 'L'
+                    status_df.loc[df['c'] > high] = 'U'
+                    status_df.loc[df['c'] < low] = 'D'
                     df_add_cols['c_status'] = status_df
                     # 当日交易量缩放情况
-                    status_df= pd.Series(['N']*len(df))
+                    status_df= pd.Series(['M']*len(df))
                     high=df['v'].rolling(window=120).apply(lambda x:x.mean() + x.std()*2)
                     low=df['v'].rolling(window=120).apply(lambda x:x.mean() - x.std()*2)
                     status_df.loc[df['v'] > high] = 'U'
@@ -440,7 +440,7 @@ class AK_REFRESH(AkshareBase):
                 pbar.update(1)         
         return error_code_info   
     
-    def price_hist(self,delta=30):
+    def price_hist_old(self,delta=30):
         price_db=sqlite3.connect(f"price_{delta}.db")
         jhjj_db=sqlite3.connect("jhjj.db")
         table = "price"
@@ -526,6 +526,122 @@ class AK_REFRESH(AkshareBase):
                 pbar.update(1)
         return error_code_info
     
+    def price_refresh(self):
+        price_db=sqlite3.connect(f"price.db")
+        jhjj_db=sqlite3.connect("jhjj.db")
+        table = "price"
+        codes_info = self._get_bk_codes("hs_a")
+        #codes_info = codes_info[:10]
+        #codes_info=[{'dm':'300096','mc':'ST易联众','jys':'sz'}]
+        print("total codes:",len(codes_info))
+        price_error_msg=""
+        jhjj_error_msg=""
+        if int(datetime.today().strftime("%H"))<16:
+            print("today=",datetime.today())
+            raise Exception("请在当天交易结束后,16点后执行")
+        try:
+            price_db.execute(f"select * from {table} limit 1")
+        except Exception as e:
+            price_error_msg="no_price_db"
+        try:
+            jhjj_db.execute(f"select * from {table} limit 1")
+        except Exception as e:
+            jhjj_error_msg="no_jhjj_db"
+
+        with tqdm(total=len(codes_info),desc="进度") as pbar:
+            error_code_info=[]                
+            date = datetime.today().strftime("%Y-%m-%d")
+            today_total_df = ak.stock_zh_a_spot_em()
+            today_total_df = today_total_df.rename(columns={'序号':'index', '代码':'code', '名称':'mc', '最新价':'c', '涨跌幅':'zd', '涨跌额':'zde', '成交量':'v', '成交额':'e',
+                                                     '振幅':'zf', '最高':'h', '最低':'l','今开':'o', '昨收':'zc', '量比':'lb', '换手率':'hs', '市盈率-动态':'pe', 
+                                                     '市净率':'sjl', '总市值':'zsz', '流通市值':'ltsz', '涨速':'zs', 
+                                                     '5分钟涨跌':'min5zd','60日涨跌幅':'day60zd', '年初至今涨跌幅':'year1zd'})
+            for code_info in codes_info:
+                code = code_info['dm']
+                mc = code_info['mc']
+                try:
+                    df_today = today_total_df[today_total_df['code']==code]
+                    df=ak.stock_intraday_em(code)
+                    #df=ak.stock_zh_a_tick_tx_js(code)
+                    if not df.empty:
+                        df=df.rename(columns={'时间':'t','成交价':'p','手数':'v','买卖盘性质':'xz'})
+                        df_jhjj = df[df.t<'09:25:00'].copy()
+                        df_jhjj['tt'] = 0
+                        df_jhjj['v0']=df_jhjj.groupby(['tt','p']).v.diff().fillna(df_jhjj.v)
+                        df_jhjj['e']=df_jhjj.p*df_jhjj.v0*100
+                        df_jhjj['vt'] = df_jhjj['e'].apply(lambda x:'cdd' if abs(x)>=1000000 else 'dd' if abs(x)>=200000 else 'zd' if abs(x)>=40000 else 'xd')
+                        df_jhjj['cnt']=1
+                        df_jhjj = df_jhjj.groupby(['tt','p','vt'])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+                        df_jhjj['code']=code
+                        df_jhjj['date']=date
+                        df_jhjj['mc']=mc
+                        if jhjj_error_msg=="no_jhjj_db":
+                            jhjj_error_msg=""
+                            print("no such table [jhjj]")
+                            df_jhjj.to_sql("price",if_exists="replace",index=False,con=jhjj_db)
+                            jhjj_db.execute("create unique index index_price on price(code,date,tt,p,vt)")
+                        else:
+                            try:
+                                df_jhjj.to_sql("price",if_exists="append",index=False,con=jhjj_db)
+                            except:
+                                pass
+                        
+                        df_price = df[df.t>='09:25:00'].copy()
+                        df_price['e']=df_price.p*df_price.v*100
+                        df_price['vt'] = df_price['e'].apply(lambda x:'cdd' if x>=1000000 else 'dd' if x>=200000 else 'zd' if x>=40000 else 'xd')
+                        df_price['cnt']=1
+                        df_price = df_price.groupby(by=["xz","vt","p"])[['v','e','cnt']].agg({'v':'sum','e':'sum','cnt':'count'}).reset_index()
+                        df_price_s = df_price[df_price['xz']=='卖盘']
+                        df_price_b = df_price[df_price['xz']=='买盘']
+                        df_price = pd.merge(df_price_s,df_price_b,on=['p','vt'],how='outer',suffixes=['_s','_b'])
+                        df_price = df_price.drop(columns=['xz_s','xz_b']).fillna(0)
+                        df_xd=df_price[df_price['vt']=='xd']
+                        df_zd=df_price[df_price['vt']=='zd']
+                        df_dd=df_price[df_price['vt']=='dd']
+                        df_cdd=df_price[df_price['vt']=='cdd']
+                        df_xd_zd = pd.merge(df_xd,df_zd,on=['p'],how='outer',suffixes=['_xd','_zd'])
+                        df_xd_zd = df_xd_zd.drop(columns=['vt_xd','vt_zd']).fillna(0)
+                        df_dd_cdd = pd.merge(df_dd,df_cdd,on=['p'],how='outer',suffixes=['_dd','_cdd'])
+                        df_dd_cdd = df_dd_cdd.drop(columns=['vt_dd','vt_cdd']).fillna(0)
+                        df_price = pd.merge(df_xd_zd,df_dd_cdd,on=['p'],how='outer')
+                        df_price = df_price.fillna(0)
+                        
+                        df_price['v_b']=df_price['v_b_xd']+df_price['v_b_zd']+df_price['v_b_dd']+df_price['v_b_cdd']
+                        df_price['v_s']=df_price['v_s_xd']+df_price['v_s_zd']+df_price['v_s_dd']+df_price['v_s_cdd']
+                        df_price['e_b']=df_price['e_b_xd']+df_price['e_b_zd']+df_price['e_b_dd']+df_price['e_b_cdd']
+                        df_price['e_s']=df_price['e_s_xd']+df_price['e_s_zd']+df_price['e_s_dd']+df_price['e_s_cdd']
+                        df_price['cnt_b']=df_price['cnt_b_xd']+df_price['cnt_b_zd']+df_price['cnt_b_dd']+df_price['cnt_b_cdd']
+                        df_price['cnt_s']=df_price['cnt_s_xd']+df_price['cnt_s_zd']+df_price['cnt_s_dd']+df_price['cnt_s_cdd']
+                        df_price['v_zljlr'] = (df_price['v_b_dd']+df_price['v_b_cdd']) - (df_price['v_s_dd']+df_price['v_s_cdd'])
+                        df_price['e_zljlr'] = (df_price['e_b_dd']+df_price['e_b_cdd']) - (df_price['e_s_dd']+df_price['e_s_cdd'])
+                        df_price['v_jlr']=df_price['v_b']-df_price['v_s']                        
+                        df_price['e_jlr']=df_price['e_b']-df_price['e_s']
+
+                        df_price.insert(0,'code',code)
+                        df_price.insert(0,'mc',mc)
+                        df_price.insert(0,'date',date)
+                        
+                        df_merged=pd.merge(df_price,df_today,on=['code'],how='left',suffixes=['','_today'])
+                        df_price['status'] = df_merged.apply(lambda x: ('U' if x['p'] > x['o'] else 'D' if x['p'] < x['c'] else 'M') if x['o']>x['c'] else
+                                                             ('D' if x['p'] < x['o'] else 'U' if x['p'] > x['c'] else 'M'),axis=1)
+                        df_price['v'] = df_price['v_b']+df_price['v_s']
+                        df_price['e'] = df_price['e_b']+df_price['e_s']
+                        df_price['cnt'] = df_price['cnt_b']+df_price['cnt_s']
+
+                        if price_error_msg=="no_price_db":
+                            price_error_msg=""
+                            print("no such table [price]")
+                            df_price.to_sql("price",if_exists="replace",index=False,con=price_db)
+                            price_db.execute("create unique index index_price on price(code,date,p)")
+                        else:
+                            df_price.to_sql("price",if_exists="append",index=False,con=price_db)
+                    else:
+                        print(f"no data on {code}-{mc}")
+                except Exception as e:
+                    error_code_info.append(f"{code}-{mc},{e}")
+                pbar.update(1)
+        return error_code_info
+
     def cmf_refresh(self):
         cmf_db=sqlite3.connect(f"cmf.db")
         table = "cmf"
@@ -628,11 +744,11 @@ class AK_REFRESH(AkshareBase):
             """更新15分钟增强数据"""
             error_code_info=self.minute_pro()
             return {"message":f"minute_pro已完成,error_code_info={error_code_info}"}
-        @self.router.get("/refresh/price/{delta}")
-        async def _refresh_price(delta:int,req:Request):
+        @self.router.get("/refresh/price")
+        async def _refresh_price(req:Request):
             """更新价格数据"""
             try:
-                error_code_info=self.price_hist(delta)
+                error_code_info=self.price_refresh()
                 return {"message":f"price已完成,error_code_info={error_code_info}"}
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")       
