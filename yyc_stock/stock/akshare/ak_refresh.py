@@ -94,20 +94,22 @@ class AK_REFRESH(AkshareBase):
                 try:
                     #origin_df = pd.read_sql(f"select * from {table} where code='{code}' and d >= '{new_sdate}'",daily_db)
                     origin_df = ak.stock_zh_a_hist(code,start_date=new_sdate.replace('-',''))
-                    origin_df=origin_df.rename(columns={'日期':'date','股票代码':'code','开盘':'o','最高':'h','最低':'l','收盘':'c','成交量':'v','成交额':'e','振幅':'zf','涨跌幅':'zd','涨跌额':'zde','换手率':'hs'})
-                    origin_df['code']=code
-                    origin_df['mc'] = mc
-                    origin_df['jys'] = jys
                     if origin_df.empty:
                         print(f"{code}-{mc} > new_sdate={new_sdate},没有找到该数据!")
                         pbar.update(1)
                         continue 
-                    if max_date and max_date >= origin_df['date'].iloc[-1]:
+                    
+                    origin_df=origin_df.rename(columns={'日期':'date','股票代码':'code','开盘':'o','最高':'h','最低':'l','收盘':'c','成交量':'v','成交额':'e','振幅':'zf','涨跌幅':'zd','涨跌额':'zde','换手率':'hs'})
+                    origin_df['code']=code
+                    origin_df['mc'] = mc
+                    origin_df['jys'] = jys
+                    origin_df.date = pd.to_datetime(origin_df.date)
+                    
+                    if max_date and d_max_date >= origin_df['date'].iloc[-1]:
                         print(f"{code}-{mc},no deed because of data exists!")
                         pbar.update(1)
                         continue 
                     df = origin_df.reset_index() 
-                    df.date = pd.to_datetime(df.date)
                     
                     df_flow = ak.stock_individual_fund_flow(code, market=jys)
                     df_flow = df_flow.rename(columns=flow_cols).drop(columns=["收盘价","涨跌幅"])
@@ -273,6 +275,15 @@ class AK_REFRESH(AkshareBase):
         #codes_info = codes_info[:100]
         #codes_info=[{'dm':'300159','mc':'新研股份'}]
         print("total codes:",len(codes_info))
+
+        szindex_cols={'时间':'datetime','开盘':'szo','收盘':'szc','最高':'szh','最低':'szl','成交量':'szv','成交额':'sze','振幅':'szzf','涨跌幅':'szzd','涨跌额':'szzde','换手率':'szhs'}            
+
+        df_szindex = ak.index_zh_a_hist_min_em('000001',period=15)
+        df_szindex = df_szindex.rename(columns=szindex_cols)
+        df_szindex['datetime'] = pd.to_datetime(df_szindex.datetime)
+        df_szindex['date'] = df_szindex.datetime.dt.strftime('%Y-%m-%d')
+        df_szindex['time'] = df_szindex.datetime.dt.strftime('%H:%M:%S')
+        df_szindex.drop(columns='datetime',inplace=True)
         with tqdm(total=len(codes_info),desc="进度") as pbar:
             error_code_info=[]
             error_msg=""
@@ -309,9 +320,15 @@ class AK_REFRESH(AkshareBase):
                         continue
                     origin_df['code']=code
                     origin_df['mc']=mc 
-                    origin_df = origin_df.rename(columns={"时间":"t","开盘":"o","收盘":"c","最高":"h","最低":"l",
+                    origin_df = origin_df.rename(columns={"时间":"datetime","开盘":"o","收盘":"c","最高":"h","最低":"l",
                                                           "涨跌幅":"zd","涨跌额":"zde","成交量":"v","成交额":"e","振幅":"zf","换手率":"hs"})
+                    origin_df['datetime'] = pd.to_datetime(origin_df.datetime)
+                    origin_df['date'] = origin_df.datetime.dt.strftime('%Y-%m-%d')
+                    origin_df['time'] = origin_df.datetime.dt.strftime('%H:%M:%S')
+                    origin_df.drop(columns='datetime',inplace=True)
                     df = origin_df.copy().reset_index() 
+
+                    df = pd.merge(df,df_szindex,on=['date','time'],how="left")
                     df_add_cols={}
                     # 后15个周期涨跌幅
                     for col in ['zd']:
@@ -323,20 +340,28 @@ class AK_REFRESH(AkshareBase):
                     df_add_cols['kl'] = _kdj_df.kl
                     df_add_cols['dl'] = _kdj_df.dl
                     df_add_cols['jl'] = _kdj_df.jl
+                    _sz_kdj_df = self._kdj(df.szc,df.szl,df.szh,9,3,3)
+                    df_add_cols['szkl'] = _sz_kdj_df.kl
+                    df_add_cols['szdl'] = _sz_kdj_df.dl
+                    df_add_cols['szjl'] = _sz_kdj_df.jl
                     # macd指标
                     _macd_df = self._macd(df.c,12,26,9)
                     df_add_cols['dif'] = _macd_df.dif
                     df_add_cols['dea'] = _macd_df.dea
                     df_add_cols['macd'] = _macd_df.macd
+                    _sz_macd_df = self._macd(df.szc,12,26,9)
+                    df_add_cols['szdif'] = _sz_macd_df.dif
+                    df_add_cols['szdea'] = _sz_macd_df.dea
+                    df_add_cols['szmacd'] = _sz_macd_df.macd
                     # 当日股价高低位置
-                    status_df= pd.Series(['N']*len(df))
+                    status_df= pd.Series(['M']*len(df))
                     high=df['c'].rolling(window=120).apply(lambda x:x.quantile(0.9))
                     low=df['c'].rolling(window=120).apply(lambda x:x.quantile(0.1))
-                    status_df.loc[df['c'] > high] = 'H'
-                    status_df.loc[df['c'] < low] = 'L'
+                    status_df.loc[df['c'] > high] = 'U'
+                    status_df.loc[df['c'] < low] = 'D'
                     df_add_cols['c_status'] = status_df
                     # 当日交易量缩放情况
-                    status_df= pd.Series(['N']*len(df))
+                    status_df= pd.Series(['M']*len(df))
                     high=df['v'].rolling(window=120).apply(lambda x:x.mean() + x.std()*2)
                     low=df['v'].rolling(window=120).apply(lambda x:x.mean() - x.std()*2)
                     status_df.loc[df['v'] > high] = 'U'
@@ -344,7 +369,7 @@ class AK_REFRESH(AkshareBase):
                     df_add_cols['v_status'] = status_df
                                         
                     # 近5,10,20,60,120交易日平均关键指标                    
-                    for col in ['c','v','e','hs','zf']:
+                    for col in ['c','v','e','hs','zf','szc']:
                         for idx in [5,10,20,40,60,120]:
                             df_add_cols[f'ma{idx}{col}']=df[col].rolling(window=idx).apply(lambda x:x.mean())        
                     
@@ -363,22 +388,23 @@ class AK_REFRESH(AkshareBase):
                             df_add_cols[f'pct{idx+1}{col}'] = df[col].pct_change(idx) * 100 
                     
                     # 前15天关键指标          
-                    for col in ['o','c','h','l','zd','v','e','hs','zf']:
+                    for col in ['o','c','h','l','zd','v','e','hs','zf','szc','szzd','szv']:
                         for idx in range(period):
                             t=idx+1
                             df_add_cols[f'{col}{t}']=df[col].shift(t)
                     #
                     df_cols = pd.concat(list(df_add_cols.values()), axis=1, keys=list(df_add_cols.keys()))
-                    df = pd.concat([origin_df,df_cols],axis=1)
-                    # 之前的kdj、macd
-                    fields={'kl','dl','jl','dif','dea','macd'}
+                    df = pd.concat([df,df_cols],axis=1)
+                    # 之前的kdj、macd、ma
+                    fields={'kl','dl','jl','dif','dea','macd','ma5c','ma10c','ma20c',
+                            'szkl','szdl','szjl','szdif','szdea','szmacd','ma5szc','ma10szc','ma20szc'}
                     for key in fields:
                         df[f"{key}1"]=df[f"{key}"].shift(1)
                         df[f"{key}2"]=df[f"{key}"].shift(2)
                     # 连续上涨、下跌天数,正负数表示
                     # 连续缩放量天数,正负数表示
                     # 连续涨跌停天数,正负数表示
-                    fields={'lxzd':'c','lxsf':'v','lxzdt':'zd'}
+                    fields={'lxzd':'c','lxsf':'v','lxzdt':'zd','lxszzd':'szzd','lxszsf':'szv'}
                     for key in fields:
                         df[key] = 0
                         for i in range(len(df)):
@@ -413,9 +439,9 @@ class AK_REFRESH(AkshareBase):
                 
                     if max_date:
                         new_sdate = datetime.strftime(d_max_date + timedelta(days=1),"%Y-%m-%d")
-                        df = df[df['t']>=new_sdate]
+                        df = df[df['date']>=new_sdate]
                     
-                    info_max_date = df.iloc[-1]['t'][:10]
+                    info_max_date = df.iloc[-1]['date']
                     if error_msg=="no_minute_table":
                         error_msg=""
                         print("create minute & info table ->",code,info_max_date)
@@ -423,7 +449,7 @@ class AK_REFRESH(AkshareBase):
                         minute_pro_db.execute("create unique index info_index on info(code)")
                         minute_pro_db.execute(f"insert into info values('{code}','{info_max_date}')")
                         df.to_sql("minute",if_exists="replace",index=False,con=minute_pro_db)
-                        minute_pro_db.execute("create unique index minute_index on minute(code,t)")
+                        minute_pro_db.execute("create unique index minute_index on minute(code,date,time)")
                     elif error_msg=="no_info_table":
                         error_msg=""
                         print("insert info ->",code,info_max_date)
