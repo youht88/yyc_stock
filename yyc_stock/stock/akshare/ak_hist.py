@@ -14,14 +14,22 @@ class AK_HIST(AkshareBase):
     def __init__(self):
         super().__init__()
         self.register_router()
-
     def hist_daily_pro(self,codes,sdate):
         df = pd.DataFrame()
-        code_list = ','.join(codes)
+        code_list = ','.join(map(lambda x:f"'{x}'",codes)) 
         sql = f"select * from daily where code in ({code_list}) and date >= '{sdate}'"
         df = self._get_df_source(db_name="daily_pro.db",sql=sql)
         #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
         return df
+    
+    def hist_minute_pro(self,codes,sdate):
+        df = pd.DataFrame()
+        code_list = ','.join(map(lambda x:f"'{x}'",codes)) 
+        sql = f"select * from minute where code in ({code_list}) and date >= '{sdate}'"
+        df = self._get_df_source(db_name="minute_pro.db",sql=sql)
+        #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
+        return df
+
     def hist_price(self,codes,sdate):
         df = pd.DataFrame()
         code_list = ','.join(codes)
@@ -59,6 +67,25 @@ class AK_HIST(AkshareBase):
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/hist/minute_pro")
+        async def _hist_minute_pro(req:Request):
+            """获取历史行情数据"""
+            try:
+                codes = self._get_request_codes(req)
+                sdate = req.query_params.get('sdate')
+                if not sdate:
+                    sdate = '2024-01-01'
+                df = self.hist_minute_pro(codes,sdate)
+                df = self._prepare_df(df,req)
+                formats = req.query_params.get('f')
+                if not formats:
+                    formats =  'zd:0,0;e:100000000,100000000'
+                content = self._to_html(df,formats=formats,fix_columns=['code','mc']) 
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+
+
         @self.router.get("/hist/price")
         async def _hist_price(req:Request):
             """获取历史交易统计数据"""
