@@ -613,6 +613,8 @@ class AK_REFRESH(AkshareBase):
                                 pass
                         
                         df_price = df[df.t>='09:25:00'].copy()
+                        p_mean = df_price.p.mean()
+                        p_std = df_price.p.std()
                         df_price['e']=df_price.p*df_price.v*100
                         df_price['vt'] = df_price['e'].apply(lambda x:'cdd' if x>=1000000 else 'dd' if x>=200000 else 'zd' if x>=40000 else 'xd')
                         df_price['cnt']=1
@@ -653,7 +655,9 @@ class AK_REFRESH(AkshareBase):
                         df_price['v'] = df_price['v_b']+df_price['v_s']
                         df_price['e'] = df_price['e_b']+df_price['e_s']
                         df_price['cnt'] = df_price['cnt_b']+df_price['cnt_s']
-
+                        df_price['p_mean'] = p_mean
+                        df_price['p_std'] = p_std
+                        df_price['p_zscore'] = (df_price['p'] - p_mean)/p_std
                         if price_error_msg=="no_price_db":
                             price_error_msg=""
                             print("no such table [price]")
