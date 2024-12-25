@@ -567,12 +567,12 @@ class StockBase:
             for item in condition:
                 key = item[0]
                 value = item[1]
-                values = value.replace('[','').replace(']','').split(',')[:2]
-                if len(values)>1:
+                if key and value:
                     keys = key.split('.')
                     key = keys[0]
                     key_func = keys[1] if len(keys)>1 else None 
                     if pd.api.types.is_datetime64_any_dtype(df[key]):
+                        values = value.replace('[','').replace(']','').split(',')[:2]
                         if key_func=='date':
                             if values[0]!='' and values[1]!='':
                                 print(f"{key} date between {values[0]} and {values[1]}")
@@ -627,7 +627,8 @@ class StockBase:
                                 print(f"{key} datetime == {values[0]}")
                                 start = pd.to_datetime(values[0])
                                 df = df[(df[key].dt.time==start)]
-                    else:
+                    elif pd.api.types.is_numeric_dtype(df[key]):
+                        values = value.replace('[','').replace(']','').split(',')[:2]
                         if re.match(number_pattern, values[0]) and re.match(number_pattern, values[1]):
                             print(f"{key} between {float(values[0])} and {float(values[1])}")
                             df = df[(df[key]>=float(values[0])) & (df[key]<=float(values[1]))]
@@ -643,26 +644,25 @@ class StockBase:
                         else:
                             print(f"{key} = {values[0]}")
                             df = df[df[key]==values[0]]
-                else:
-                    keys = key.split('.')
-                    key = keys[0]
-                    key_func = keys[1] if len(keys)>1 else None 
-                    if key_func == 'regex':
-                        values = item[1].split(',')
-                        print(f"{key} match {values[0]}")
-                        df = df[df[key].str.contains(values[0],regex=True)]
                     else:
-                        # 包含字符串或不包含字符串
-                        values = item[1].split(',')
-                        filter = pd.Series([False] * len(df))
-                        for value in values:
-                            if value.startswith("!"):
-                                print(f"{key} not contains {value[1:]}")
-                                filter = filter | ~df[key].str.contains(value[1:])
-                            else:
-                                print(f"{key} contains {value}")
-                                filter = filter | df[key].str.contains(value)
-                        df = df[filter]
+                        values = value.split(',')
+                        if key_func == 'regex':
+                            filter = pd.Series([False] * len(df))
+                            for value in values:
+                                print(f"{key} match {value}")
+                                filter = filter | df[key].str.contains(value,regex=True)
+                            df = df[filter]
+                        else:
+                            # 包含字符串或不包含字符串
+                            filter = pd.Series([False] * len(df))
+                            for value in values:
+                                if value.startswith("!"):
+                                    print(f"{key} not contains {value[1:]}")
+                                    filter = filter | ~df[key].str.contains(value[1:])
+                                else:
+                                    print(f"{key} contains {value}")
+                                    filter = filter | df[key].str.contains(value)
+                            df = df[filter]
             return df
         except Exception as e:
             raise Exception(f"condition express is error:{e}") 
