@@ -543,6 +543,8 @@ class StockBase:
         limit = int(req.query_params.get('n',0))
         add_cols = req.query_params.get('a')
         groupby = req.query_params.get('g')
+        column = req.query_params.get('c')
+        column_regex = req.query_params.get('c.regex')
         if add_cols:
             print("add cols=",add_cols)
             df = self._parse_add_express(df,add_cols) 
@@ -559,7 +561,25 @@ class StockBase:
             print("order=",order)
             df = self._parse_order_express(df,order) 
         if limit:
+            print("limit=",limit)
             df = df.head(limit)
+        if column:
+            print("column=",column)
+            df = self._parse_column_express(df,column)
+        elif column_regex:
+            print("column_regex=",column_regex)
+            df = self._parse_column_express(df,column_regex,regex=True)
+
+        return df
+    def _parse_column_express(self,df:pd.DataFrame,column:str,regex=False)->pd.DataFrame:
+        columns = column.split(",")
+        if regex:
+            df_filters = [df.filter(regex=item) for item in columns]
+            df = pd.concat(df_filters, axis=1)        
+        else:
+            df_filters = [df.filter(like=item) for item in columns]
+            df = pd.concat(df_filters, axis=1)
+        df = df.loc[:, ~df.columns.duplicated()]
         return df
     def _parse_condition_express(self,df:pd.DataFrame,condition:list[tuple[str,str]])->pd.DataFrame:
         try:
