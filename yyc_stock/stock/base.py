@@ -452,6 +452,18 @@ class StockBase:
             else:
                 raise Exception(f'没有找到[{bk_name}]相关板块!')
 
+    def _get_stock_jysc(self,code:str)->str:
+        '''获取股票的交易市场，主板zb、创业板cyb、科创板kcb、北交所bj'''
+        if code.startswith('300'):
+            return 'cyb'
+        elif code.startswith('688'):
+            return 'kcb'
+        elif code.startswith('60') or code.startswith('00'):
+            return 'zb'
+        elif code.startswith('8') or code.startswith('9'):
+            return 'bj'
+        else:
+            return 'na'
     def _get_stock_code(self,stock_name:str,force=False)->dict:
         """根据股票或指数名称获取股票/指数代码"""
         if not self.gpdm:
@@ -488,7 +500,7 @@ class StockBase:
             stock_info = list(filter(lambda item:item["symbol"]==code,self.gpdm))
             if stock_info:
                 name = stock_info[0]['name']
-                return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code}
+                return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code,"jysc":self._get_stock_jysc(code)}
             else:
                 raise Exception(f"没有找到{stock_name}代码信息")
         elif stock_name.endswith('.SH') or stock_name.endswith('.SZ') or stock_name.endswith('.BJ'):
@@ -501,7 +513,7 @@ class StockBase:
             stock_info = list(filter(lambda item:item["symbol"]==code,self.gpdm))
             if stock_info:
                 name = stock_info[0]['name']
-                return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code}
+                return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code,"jysc":self._get_stock_jysc(code)}
             else:
                 raise Exception(f"没有找到{stock_name}代码信息")
         elif stock_name.startswith('SH') or stock_name.startswith('SZ') or stock_name.startswith('BJ'):
@@ -514,7 +526,7 @@ class StockBase:
             stock_info = list(filter(lambda item:item["symbol"]==code,self.gpdm))
             if stock_info:
                 name = stock_info[0]['name']
-                return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code}
+                return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code,"jysc":self._get_stock_jysc(code)}
             else:
                 raise Exception(f"没有找到{stock_name}代码信息")
         elif stock_name.isnumeric():
@@ -526,7 +538,7 @@ class StockBase:
                 mr_code = f"{jys}{code}"
                 name = stock_info[0]['name']
                 ball_code = f"{jys.upper()}{code}"
-                return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code}
+                return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code,"jysc":self._get_stock_jysc(code)}
             else:
                 raise Exception(f"没有找到{stock_name}代码信息")
         else:
@@ -539,7 +551,7 @@ class StockBase:
                     name = stock_info[0]['name']
                     mr_code = f"{jys}{code}"
                     ball_code = f"{jys.upper()}{code}"
-                    return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code}
+                    return {"code":code,"mr_code":mr_code,"ts_code":ts_code,"name":name,"jys":jys,"ball_code":ball_code,"jysc":self._get_stock_jysc(code)}
                 else:
                     raise Exception(f"没有找到{stock_name}代码信息")
             except Exception as e:
@@ -707,7 +719,7 @@ class StockBase:
         except Exception as e:
             raise Exception(f"groupby express example `code,mc;price:sum,zf:mean,...` ,but `{groupby}` is error:{e}")
     def _parse_add_express(self,df:pd.DataFrame,add_cols:str)->pd.DataFrame:
-        # a=x:c*c1;y=c-c1
+        # a=x:a.shift(-5)*b;y:(a.mean()+b.abs())/2;z:lambda row:'U' if row.a>row.b else 'D'...
         try:
             add_col_parts = [item for item in add_cols.split(';')]
             for add_col in add_col_parts:
@@ -722,7 +734,7 @@ class StockBase:
                     df[key] = df.eval(value)         
             return df
         except Exception as e:
-            raise Exception(f"add column express example `x:a*b;y:(a+b)/2;z:lambda row:'U' if row.a>row.b else 'D'...` ,but `{add_cols}` is error:{e}")
+            raise Exception(f"add column express example `x:a.shift(-5)*b;y:(a.mean()+b.abs())/2;z:lambda row:'U' if row.a>row.b else 'D'...` ,but `{add_cols}` is error:{e}")
     def _parse_order_express(self,df:pd.DataFrame,order:str)->pd.DataFrame:
         try:
             express = re.findall(r'(add|sub|mul|div|avg)\((.*)\)',order)

@@ -105,7 +105,8 @@ class AK_CURRENT(AkshareBase):
                 codes = self._get_request_codes(req)
                 df = self.current(codes)
                 df = self._prepare_df(df,req)
-                content = self._to_html(df,formats=req.query_params.get('f'),fix_columns=['代码','名称','换手率'])
+                desc= req.query_params.get('desc')
+                content = self._to_html(df,formats=req.query_params.get('f'),fix_columns=['代码','名称','换手率'],url=req.url,desc=desc)
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")

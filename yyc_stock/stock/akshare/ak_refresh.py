@@ -110,6 +110,7 @@ class AK_REFRESH(AkshareBase):
                 code = code_info['dm']
                 mc = code_info['mc']
                 jys = code_info['jys']
+                jysc = code_info['jysc']
                 new_sdate = sdate
                 max_date=None
                 try:
@@ -141,6 +142,7 @@ class AK_REFRESH(AkshareBase):
                     origin_df['code']=code
                     origin_df['mc'] = mc
                     origin_df['jys'] = jys
+                    origin_df['jysc'] = jysc
                     origin_df.date = pd.to_datetime(origin_df.date)
                     
                     if max_date and d_max_date >= origin_df['date'].iloc[-1]:
@@ -239,6 +241,11 @@ class AK_REFRESH(AkshareBase):
                     # 连续缩放量天数,正负数表示
                     # 连续涨跌停天数,正负数表示
                     fields={'lxzd':'c','lxsf':'v','lxzdt':'zd','lxzljlr':'zljlr','lxszzd':'szzd','lxszsf':'szv'}
+                    zdtbz=9.9
+                    if jysc=='cyb' or jysc=='kcb':
+                        zdtbz=19.9
+                    elif jysc=='bj':
+                        zdtbz=29.9
                     for key in fields:
                         df[key] = 0
                         for i in range(len(df)):
@@ -246,7 +253,7 @@ class AK_REFRESH(AkshareBase):
                             for j in range(days-1):
                                 j_str = '' if j==0 else str(j)
                                 if key=='lxzdt':
-                                    if df.loc[i, f"{fields[key]}{j_str}"] > 9.9:
+                                    if df.loc[i, f"{fields[key]}{j_str}"] > zdtbz:
                                         count += 1
                                     else:
                                         break
@@ -264,7 +271,7 @@ class AK_REFRESH(AkshareBase):
                                 for j in range(days-1):
                                     j_str = '' if j==0 else str(j)
                                     if key=='lxzdt':
-                                        if df.loc[i, f"{fields[key]}{j_str}"] < -9.9:
+                                        if df.loc[i, f"{fields[key]}{j_str}"] < -zdtbz:
                                             count += 1
                                         else:
                                             break
@@ -309,6 +316,48 @@ class AK_REFRESH(AkshareBase):
                 pbar.update(1)
         return error_code_info
 
+    def update_minute_pro(self):
+        minute_pro_db=sqlite3.connect("minute_pro.db")
+        table = "minute"
+        codes_info = self._get_bk_codes("hs_a")
+        #codes_info = codes_info[:100]
+        #codes_info=[{'dm':'300159','mc':'新研股份'}]
+        with tqdm(total=len(codes_info),desc="进度") as pbar:
+            period=15
+            error_code_info=[]
+            for code_info in codes_info:
+                code = code_info['dm']
+                mc = code_info['mc']
+                try:
+                    df = pd.read_sql(f"select code,date,time,zd,fzd from {table} where code='{code}' and fzd like 'SOME:%'",minute_pro_db)
+                    if df.empty:
+                        pbar.update(1)
+                        continue
+                    df['datetime'] = pd.to_datetime(df.date+' '+df.time)
+                    start_datetime = datetime.strftime(df.datetime.min(),'%Y-%m-%d %H:%M:%S')
+                    end_datetime = datetime.strftime(df.datetime.max() + timedelta(minutes=300),"%Y-%m-%d %H:%M:%S") 
+                    minute_df = ak.stock_zh_a_hist_min_em(code,start_date=start_datetime,end_date=end_datetime,period=15)
+                    minute_df['时间'] = pd.to_datetime(minute_df.时间)
+                    minute_df['date'] = minute_df.时间.dt.strftime('%Y-%m-%d')
+                    minute_df['time'] = minute_df.时间.dt.strftime('%H:%M:%S')
+                    for idx in range(period):
+                        t=idx+1
+                        minute_df[f'fzd_{t}']=minute_df['涨跌幅'].shift(-t)
+                    for row in df.itertuples(index=True, name='Pandas'):
+                        date_str = datetime.strftime(row.datetime,'%Y-%m-%d')
+                        time_str = datetime.strftime(row.datetime,'%H:%M:%S')
+                        minute_pice_df = minute_df[(minute_df.date==date_str) & (minute_df.time==time_str)]
+                        data = minute_pice_df.filter(like='fzd').to_dict(orient='records')[0]
+                        fzd = str({int(key.split('_')[1]): value for key, value in data.items()})
+                        if not all(str(item)!='nan' for item in data.values()):
+                            fzd = 'SOME:'+fzd
+                        minute_pro_db.execute(f"update {table} set fzd='{fzd}' where code='{code}' and date='{date_str}' and time='{time_str}'")
+                    minute_pro_db.commit()
+                except Exception as e:
+                    error_code_info.append(f"{code}-{mc},{e}")    
+                pbar.update(1)
+        return error_code_info
+
     def minute_pro(self):
         minute_pro_db=sqlite3.connect("minute_pro.db")
         codes_info = self._get_bk_codes("hs_a")
@@ -332,6 +381,8 @@ class AK_REFRESH(AkshareBase):
             for code_info in codes_info:
                 code = code_info['dm']
                 mc = code_info['mc']
+                jys = code_info['jys']
+                jysc = code_info['jysc']
                 new_sdate = sdate
                 max_date=None
                 try:
@@ -360,6 +411,8 @@ class AK_REFRESH(AkshareBase):
                         continue
                     origin_df['code']=code
                     origin_df['mc']=mc 
+                    origin_df['jys']=jys
+                    origin_df['jysc']=jysc
                     origin_df = origin_df.rename(columns={"时间":"datetime","开盘":"o","收盘":"c","最高":"h","最低":"l",
                                                           "涨跌幅":"zd","涨跌额":"zde","成交量":"v","成交额":"e","振幅":"zf","换手率":"hs"})
                     origin_df['datetime'] = pd.to_datetime(origin_df.datetime)
@@ -372,7 +425,7 @@ class AK_REFRESH(AkshareBase):
                     df_add_cols={}
                     # 后15个周期涨跌幅
                     # 初始设置为空，由update minute_pro来更新
-                    df_add_cols['fzd']=None
+                    df_add_cols['fzd']='SOME:'
                     # for col in ['zd']:
                     #     for idx in range(period):
                     #         t=idx+1
@@ -447,6 +500,11 @@ class AK_REFRESH(AkshareBase):
                     # 连续缩放量天数,正负数表示
                     # 连续涨跌停天数,正负数表示
                     fields={'lxzd':'c','lxsf':'v','lxzdt':'zd','lxszzd':'szzd','lxszsf':'szv'}
+                    zdtbz=9.9
+                    if jysc=='cyb' or jysc=='kcb':
+                        zdtbz=19.9
+                    elif jysc=='bj':
+                        zdtbz=29.9
                     for key in fields:
                         df[key] = 0
                         for i in range(len(df)):
@@ -454,7 +512,7 @@ class AK_REFRESH(AkshareBase):
                             for j in range(period-1):
                                 j_str = '' if j==0 else str(j)
                                 if key=='lxzdt':
-                                    if df.loc[i, f"{fields[key]}{j_str}"] > 9.9:
+                                    if df.loc[i, f"{fields[key]}{j_str}"] > zdtbz:
                                         count += 1
                                     else:
                                         break
@@ -467,7 +525,7 @@ class AK_REFRESH(AkshareBase):
                                 for j in range(period-1):
                                     j_str = '' if j==0 else str(j)
                                     if key=='lxzdt':
-                                        if df.loc[i, f"{fields[key]}{j_str}"] < -9.9:
+                                        if df.loc[i, f"{fields[key]}{j_str}"] < -zdtbz:
                                             count += 1
                                         else:
                                             break
