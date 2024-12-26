@@ -705,10 +705,15 @@ class StockBase:
                 item = add_col.split(':')
                 key = item[0]
                 value=item[1]
-                df[key] = df.eval(value)         
+                if value.startswith('lambda'):
+                    value = f'{value}:{item[2]}'
+                    func=eval(value)
+                    df[key] = df.apply(func,axis=1)
+                else:
+                    df[key] = df.eval(value)         
             return df
         except Exception as e:
-            raise Exception(f"add column express example `x:a*b;y:(a+b)/2;...` ,but `{add_cols}` is error:{e}")
+            raise Exception(f"add column express example `x:a*b;y:(a+b)/2;z:lambda row:'U' if row.a>row.b else 'D'...` ,but `{add_cols}` is error:{e}")
     def _parse_order_express(self,df:pd.DataFrame,order:str)->pd.DataFrame:
         try:
             express = re.findall(r'(add|sub|mul|div|avg)\((.*)\)',order)
