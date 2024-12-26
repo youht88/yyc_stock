@@ -571,14 +571,10 @@ class StockBase:
             df = self._parse_column_express(df,column_regex,regex=True)
 
         return df
-    def _parse_column_express(self,df:pd.DataFrame,column:str,regex=False)->pd.DataFrame:
+    def _parse_column_express(self,df:pd.DataFrame,column:str)->pd.DataFrame:
         columns = column.split(",")
-        if regex:
-            df_filters = [df.filter(regex=item) for item in columns]
-            df = pd.concat(df_filters, axis=1)        
-        else:
-            df_filters = [df.filter(like=item) for item in columns]
-            df = pd.concat(df_filters, axis=1)
+        df_filters = [df.filter(regex=item) for item in columns]
+        df = pd.concat(df_filters, axis=1)        
         df = df.loc[:, ~df.columns.duplicated()]
         return df
     def _parse_condition_express(self,df:pd.DataFrame,condition:list[tuple[str,str]])->pd.DataFrame:
