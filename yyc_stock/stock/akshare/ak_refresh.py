@@ -43,6 +43,44 @@ class AK_REFRESH(AkshareBase):
                 self._get_akbk_codes(code)                
                 pbar.update(1) 
         return {"message":"ok"}
+    def update_daily_pro(self):
+        daily_pro_db=sqlite3.connect("daily_pro.db")
+        table = "daily"
+        codes_info = self._get_bk_codes("hs_a")
+        #codes_info = codes_info[:100]
+        #codes_info=[{'dm':'300159','mc':'新研股份'}]
+        with tqdm(total=len(codes_info),desc="进度") as pbar:
+            days=15
+            error_code_info=[]
+            for code_info in codes_info:
+                code = code_info['dm']
+                mc = code_info['mc']
+                try:
+                    df = pd.read_sql(f"select code,date,zd,fzd from {table} where code='{code}' and fzd like 'SOME:%'",daily_pro_db)
+                    if df.empty:
+                        pbar.update(1)
+                        continue
+                    df.date = pd.to_datetime(df.date)
+                    start_date = datetime.strftime(df.date.min(),'%Y-%m-%d')
+                    end_date = datetime.strftime(df.date.max() + timedelta(days=15),"%Y-%m-%d") 
+                    daily_df = ak.stock_zh_a_hist(code,start_date=start_date.replace('-',''),end_date=end_date.replace('-',''))
+                    daily_df.日期=pd.to_datetime(daily_df.日期)
+                    for idx in range(days):
+                        t=idx+1
+                        daily_df[f'fzd_{t}']=daily_df['涨跌幅'].shift(-t)
+                    for date in df.date:
+                        date_str = datetime.strftime(date,'%Y-%m-%d')
+                        daily_date_df = daily_df[daily_df.日期==date_str]
+                        data = daily_date_df.filter(like='fzd').to_dict(orient='records')[0]
+                        fzd = str({int(key.split('_')[1]): value for key, value in data.items()})
+                        if not all(str(item)!='nan' for item in data.values()):
+                            fzd = 'SOME:'+fzd
+                        daily_pro_db.execute(f"update {table} set fzd='{fzd}' where code='{code}' and date='{date_str}'")
+                    daily_pro_db.commit()
+                except Exception as e:
+                    error_code_info.append(f"{code}-{mc},{e}")    
+                pbar.update(1)
+        return error_code_info
     
     def daily_pro(self):
         daily_pro_db=sqlite3.connect("daily_pro.db")
@@ -125,10 +163,12 @@ class AK_REFRESH(AkshareBase):
                     
                     df_add_cols={}
                     # 后15天涨跌幅
-                    for col in ['zd']:
-                        for idx in range(days):
-                            t=idx+1
-                            df_add_cols[f'p{col}_{t}']=df[col].shift(-t)
+                    # 改为初始设置为空，由update daily_pro来更新
+                    df_add_cols['fzd']='SOME:'
+                    # for col in ['zd']:
+                    #     for idx in range(days):
+                    #         t=idx+1
+                    #         df_add_cols[f'p{col}_{t}']=df[col].shift(-t)
                     # kdj指标
                     _kdj_df = self._kdj(df.c,df.l,df.h,9,3,3)
                     df_add_cols['kl'] = _kdj_df.kl
@@ -331,10 +371,12 @@ class AK_REFRESH(AkshareBase):
                     df = pd.merge(df,df_szindex,on=['date','time'],how="left")
                     df_add_cols={}
                     # 后15个周期涨跌幅
-                    for col in ['zd']:
-                        for idx in range(period):
-                            t=idx+1
-                            df_add_cols[f'p{col}_{t}']=df[col].shift(-t)
+                    # 初始设置为空，由update minute_pro来更新
+                    df_add_cols['fzd']=None
+                    # for col in ['zd']:
+                    #     for idx in range(period):
+                    #         t=idx+1
+                    #         df_add_cols[f'p{col}_{t}']=df[col].shift(-t)
                     # kdj指标
                     _kdj_df = self._kdj(df.c,df.l,df.h,9,3,3)
                     df_add_cols['kl'] = _kdj_df.kl
@@ -769,6 +811,13 @@ class AK_REFRESH(AkshareBase):
             """更新日线增强数据"""
             error_code_info=self.daily_pro()
             return {"message":f"daily_pro已完成,error_code_info={error_code_info}"}
+
+        @self.router.get("/update/daily_pro")
+        async def _update_daily_pro(req:Request):
+            """更新日线增强数据"""
+            error_code_info=self.update_daily_pro()
+            return {"message":f"update_daily_pro已完成,error_code_info={error_code_info}"}
+        
         @self.router.get("/refresh/minute_pro")
         async def _refresh_minute_pro(req:Request):
             """更新15分钟增强数据"""

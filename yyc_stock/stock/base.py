@@ -13,11 +13,12 @@ from ylz_utils.config import Config
 from ylz_utils.database.elasticsearch import ESLib
 
 import concurrent.futures
+from urllib.parse import unquote
 
 from fastapi import FastAPI, HTTPException,Request,Response,APIRouter
 import akshare as ak
 
-def gen_content_html(data_table,state_table,fix_col_index:list[int]=[]):
+def gen_content_html(data_table,state_table,fix_col_index:list[int]=[],url=None,desc=None):
     if fix_col_index:
         fix_columns = ','.join([f'th:nth-child({idx}), td:nth-child({idx})' for idx in fix_col_index])
         fix_columns_css = fix_columns + ''' {
@@ -28,6 +29,8 @@ def gen_content_html(data_table,state_table,fix_col_index:list[int]=[]):
             }'''
     else:
         fix_columns_css = ''
+    if url:
+        url = unquote(str(url))
     #th.代码, td.代码, th.名称,td.名称     
     html_content = f"""
     <!DOCTYPE html>
@@ -90,6 +93,12 @@ def gen_content_html(data_table,state_table,fix_col_index:list[int]=[]):
         </style>
     </head>
     <body>
+        <div>
+        <h2>说明:</h2> <p>{desc}</p>
+        </div>
+        <div>
+        <h2>URL: </h2> <p>{url}</p>
+        </div>
         <h2>统计 <button id="export_state_btn" class="export-button">导出为 CSV</button> </h2>
         {state_table}
         <h2>数据 <button id="export_data_btn" class="export-button">导出为 CSV</button> </h2>
@@ -759,7 +768,7 @@ class StockBase:
         except Exception as e:
             raise Exception(f"order express error:{e}")
 
-    def _to_html(self,df:pd.DataFrame,columns:list[str]=None,formats:str=None,fix_columns:list[str]=[]):
+    def _to_html(self,df:pd.DataFrame,columns:list[str]=None,formats:str=None,fix_columns:list[str]=[],url=None,desc=None):
         datetime_cols = df.select_dtypes(include=['datetime']).columns.to_list()
         number_cols= df.select_dtypes(include=['int','float']).columns.to_list()
         str_cols= df.select_dtypes(include=['object']).columns.to_list()
@@ -784,7 +793,7 @@ class StockBase:
         # print("datetime_cols:",datetime_col_index)
         # print("number_cols:",number_col_index)
         # print("str_cols:",str_col_index)
-        content_html = gen_content_html(data_table,state_table,fix_col_index=fix_col_index)        
+        content_html = gen_content_html(data_table,state_table,fix_col_index=fix_col_index,url=url,desc=desc)        
         return content_html
     
     def _kdj(self,prices, low_prices, high_prices, n=9, k=3, d=3):

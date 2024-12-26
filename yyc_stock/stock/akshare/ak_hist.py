@@ -17,6 +17,7 @@ class AK_HIST(AkshareBase):
     def hist_daily_pro(self,codes,sdate):
         df = pd.DataFrame()
         code_list = ','.join(map(lambda x:f"'{x}'",codes)) 
+        print("???",sdate)
         sql = f"select * from daily where code in ({code_list}) and date >= '{sdate}'"
         df = self._get_df_source(db_name="daily_pro.db",sql=sql)
         #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
@@ -63,7 +64,8 @@ class AK_HIST(AkshareBase):
                 formats = req.query_params.get('f')
                 if not formats:
                     formats =  'zd:0,0;e:100000000,100000000'
-                content = self._to_html(df,formats=formats,fix_columns=['code','mc'])
+                desc= req.query_params.get('desc')
+                content = self._to_html(df,formats=formats,fix_columns=['code','mc'],url=req.url,desc=desc)
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
