@@ -110,7 +110,7 @@ class AK_REFRESH(AkshareBase):
                 code = code_info['dm']
                 mc = code_info['mc']
                 jys = code_info['jys']
-                jysc = code_info['jysc']
+                jysc = self._get_stock_jysc(code)
                 new_sdate = sdate
                 max_date=None
                 try:
@@ -382,7 +382,7 @@ class AK_REFRESH(AkshareBase):
                 code = code_info['dm']
                 mc = code_info['mc']
                 jys = code_info['jys']
-                jysc = code_info['jysc']
+                jysc = self._get_stock_jysc(code)
                 new_sdate = sdate
                 max_date=None
                 try:
@@ -844,7 +844,8 @@ class AK_REFRESH(AkshareBase):
                     error_code_info.append(f"{code}-{mc},{e}")
                 pbar.update(1)
         return error_code_info
-
+    def refresh_se(self):
+        pass
     def register_router(self):
         @self.router.get("/refresh/akbk")
         async def _refresh_akbk(req:Request):
@@ -856,6 +857,14 @@ class AK_REFRESH(AkshareBase):
                 return self.akbk_refresh()
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/refresh/se")
+        async def _refresh_se(req:Request):
+            """更新融资融券信息"""
+            try:
+                return self.refresh_se()
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+
         @self.router.get("/refresh/cmf")
         async def _refresh_cmf(req:Request):
             """更新筹码峰信息"""

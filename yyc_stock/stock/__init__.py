@@ -20,6 +20,7 @@ class StockLib():
         self.ak_flow = AK_FLOW()
         self.ak_rank = AK_RANK()
         self.ak_lhb = AK_LHB()
+        self.ak_pankou = AK_PANKOU()
         self.hibk = HIBK()
         self.hijg = HIJG()
         self.higg = HIGG()
@@ -59,6 +60,7 @@ class StockLib():
         app.include_router(self.ak_flow.router,prefix="/ak")
         app.include_router(self.ak_rank.router,prefix="/ak")
         app.include_router(self.ak_lhb.router,prefix="/ak")
+        app.include_router(self.ak_pankou.router,prefix="/ak")
 
 if __name__ == "__main__":
     import uvicorn

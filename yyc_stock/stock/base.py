@@ -46,6 +46,7 @@ def gen_content_html(data_table,state_table,fix_col_index:list[int]=[],url=None,
                 border: 1px solid #ddd;
                 padding: 8px;
                 text-align: left;
+                white-space: nowrap;
             }}
             {fix_columns_css} 
 
@@ -932,6 +933,7 @@ class StockBase:
         @self.router.get("/test")
         async def test(req:Request):
             return self._get_rx("600111",sdate="2024-01-01",edate="2024-12-31")
+
         @self.router.get("/zx/add/{key}")
         async def add_zx(key:str,req:Request):
             '''增加自选股票列表'''

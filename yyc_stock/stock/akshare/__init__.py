@@ -7,3 +7,4 @@ from yyc_stock.stock.akshare.ak_hist import AK_HIST
 from yyc_stock.stock.akshare.ak_flow import AK_FLOW
 from yyc_stock.stock.akshare.ak_rank import AK_RANK
 from yyc_stock.stock.akshare.ak_lhb import AK_LHB
+from yyc_stock.stock.akshare.ak_pankou import AK_PANKOU

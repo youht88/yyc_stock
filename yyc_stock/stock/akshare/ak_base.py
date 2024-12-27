@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import sqlite3
 from fastapi import HTTPException, Request
@@ -235,8 +237,35 @@ class AkshareBase(StockBase):
         print(cond_str)     
         df = pd.read_sql(f"select * from price where code in ({codes_str}) {cond_str}",price_db)
         return df
-
+    def get_help(self,func)->str:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            help(func)
+        docstring =buffer.getvalue()
+        html_content = "<html><body>"
+        html_content += f"<h1>函数{func.__name__}帮助文档</h1>"
+        html_content += "<pre>" + docstring.replace('\n', '<br>') + "</pre>"
+        html_content += "</body></html>"
+        return html_content
     def register_router(self):
+        @self.router.get("/")
+        async def ak_df(req:Request):
+            try:
+                #df = self._get_df_source(db_name="price_30.db",sql=f"select * from price where code='{code}'")
+                func = req.query_params.get("func")
+                if func:
+                    df = eval(f"ak.{func}")
+                    if callable(df):
+                        content = self.get_help(df)
+                    else:
+                        df = self._prepare_df(df,req)
+                        content = self._to_html(df,formats=req.query_params.get('f'),url=req.url)
+                    return HTMLResponse(content=content)
+                else:
+                    raise Exception("必须指定func参数，例如func=stock_margin_detail_sse('20241226'),如果要获得函数的帮助文档则func=stock_margin_detail_sse")
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")            
+            
         @self.router.get("/fx1")
         async def fx1(req:Request):
             """fx1"""
