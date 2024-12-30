@@ -13,7 +13,7 @@ pysnowball = "^0.1.3"
 tushare = "^1.4.13"
 akshare = "^1.15.22"
 
-ylz-utils = "^0.3.26"
+ylz-utils = "^0.3.27"
 
 
 [build-system]

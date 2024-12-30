@@ -99,6 +99,7 @@ class AK_TORCH(AkshareBase):
                         tgt = torch.zeros(batch_x.size(0), seq_length, 1)
                         tgt[:, :-1, :] = batch_x[:, :-1, :]
                         output = model(batch_x.permute(1, 0, 2), tgt.permute(1, 0, 2))
+                        print(output)
                         predictions.append(output.numpy())
                         actuals.append(batch_y.numpy())
                 #10. 将预测和实际结果合并
