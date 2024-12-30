@@ -6,14 +6,14 @@ authors = ["Your Name <you@example.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.13"
+python = "^3.12"
 #需要SNOWBALL_TOKEN
 pysnowball = "^0.1.3"
 #需要TUSHARE_TOKEN
 tushare = "^1.4.13"
 akshare = "^1.15.22"
 
-ylz-utils = "^0.3.25"
+ylz-utils = "^0.3.26"
 
 
 [build-system]
