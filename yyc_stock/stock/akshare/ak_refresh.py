@@ -86,7 +86,7 @@ class AK_REFRESH(AkshareBase):
         daily_pro_db=sqlite3.connect("daily_pro.db")
         table = "daily"
         codes_info = self._get_bk_codes("hs_a")
-        #codes_info = codes_info[:1]
+        #codes_info = codes_info[:5]
         #codes_info=[{'dm':'300159','mc':'新研股份'}]
         print("total codes:",len(codes_info))
         flow_cols={'日期': 'date', '主力净流入-净额': 'zljlr', '主力净流入-净占比': 'zljlrl', 
@@ -166,7 +166,7 @@ class AK_REFRESH(AkshareBase):
                     df_add_cols={}
                     # 后15天涨跌幅
                     # 改为初始设置为空，由update daily_pro来更新
-                    df_add_cols['fzd']='SOME:'
+                    df_add_cols['fzd']=pd.Series(['SOME:']*len(df))
                     # for col in ['zd']:
                     #     for idx in range(days):
                     #         t=idx+1
@@ -425,7 +425,7 @@ class AK_REFRESH(AkshareBase):
                     df_add_cols={}
                     # 后15个周期涨跌幅
                     # 初始设置为空，由update minute_pro来更新
-                    df_add_cols['fzd']='SOME:'
+                    df_add_cols['fzd']=pd.Series(['SOME:']*len(df))
                     # for col in ['zd']:
                     #     for idx in range(period):
                     #         t=idx+1
