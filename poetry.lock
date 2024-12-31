@@ -194,13 +194,13 @@ reference = "tsinghua"
 
 [[package]]
 name = "akshare"
-version = "1.15.59"
+version = "1.15.60"
 description = "AKShare is an elegant and simple financial data interface library for Python, built for human beings!"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "akshare-1.15.59-py3-none-any.whl", hash = "sha256:743d2878c0bfbb17e86045d4685b657129fffc892be84e00c7e39915e4673ed5"},
-    {file = "akshare-1.15.59.tar.gz", hash = "sha256:fecbd0237a0e8f6331a8dad4611ab3b984cb4ea1998577958fba66e10a347e62"},
+    {file = "akshare-1.15.60-py3-none-any.whl", hash = "sha256:30487d216d39882c5889caaac6560b141cf880b5c773853ee9564bf96d3f3171"},
+    {file = "akshare-1.15.60.tar.gz", hash = "sha256:fb3aa65febcd80e9e39d46a1bc6a44d3e9a74be77c4b525248d099c779d7c0c0"},
 ]
 
 [package.dependencies]
@@ -6575,13 +6575,13 @@ reference = "tsinghua"
 
 [[package]]
 name = "ylz-utils"
-version = "0.3.26"
+version = "0.3.27"
 description = "ylz 工具类"
 optional = false
 python-versions = ">=3.12,<4.0"
 files = [
-    {file = "ylz_utils-0.3.26-py3-none-any.whl", hash = "sha256:30e74db663c534f9b8dd4341fd76da5ed15f7ac88646f3fc900600c2f6bf7726"},
-    {file = "ylz_utils-0.3.26.tar.gz", hash = "sha256:88d597a30305176f9cb11150592ae16b7d029a77ee2a9c12ee206404e2b36ff9"},
+    {file = "ylz_utils-0.3.27-py3-none-any.whl", hash = "sha256:5846242931d24858e6a475469c261538d6f2fc9ce279247bd559744270ec4a1a"},
+    {file = "ylz_utils-0.3.27.tar.gz", hash = "sha256:21989a6c6c4ec0d04f0f965aaf87c3125bf3d1c1c28197a5334ea56f8dcfb7df"},
 ]
 
 [package.dependencies]
@@ -6620,6 +6620,7 @@ markdownify = ">=0.13.1,<0.14.0"
 matplotlib = ">=3.9.0,<4.0.0"
 mpmath = ">=1.3.0,<2.0.0"
 neo4j = ">=5.23.1,<6.0.0"
+numpy = "<2"
 opentelemetry-sdk = ">=1.27.0,<2.0.0"
 pdfminer = ">=20191125,<20191126"
 pdfplumber = ">=0.11.2,<0.12.0"
@@ -6691,4 +6692,4 @@ reference = "tsinghua"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "4acf43323f47d530ef5c242afbdce822a90fcf1803f7de351b132893cc0c236d"
+content-hash = "d7c25602682d0e618d95b554af22e21c30f7a07e3a6d4beb0c18f15b22c3115d"
