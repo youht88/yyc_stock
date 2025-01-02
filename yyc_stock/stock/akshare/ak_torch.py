@@ -26,24 +26,26 @@ class AK_TORCH(AkshareBase):
             '''测试torch2,根据前input_days天的数据预测后output_days的股价'''
             try:
                 df = self._get_df_source("daily_pro.db","select * from daily where code='000001'")
-                daily = df[['c']]
+                daily = df[['c','h','l']]
                 daily.reset_index(drop=True,inplace=True)
                 daily_numpy = daily.values
-                daily_numpy = np.random.rand(200)*100
+                #daily_numpy = np.random.rand(200)*100
                 input_days = 20
                 output_days = 3
                 data_len = len(daily_numpy) - input_days - output_days +1
-                src_data = torch.tensor([daily_numpy[i:i+input_days] for i in range(data_len)]).unsqueeze(-1).float()
-                tgt_data = torch.tensor([daily_numpy[i+input_days:i+input_days+output_days] for i in range(data_len)]).unsqueeze(-1).float()
-                
+                src_data = torch.tensor([daily_numpy[i:i+input_days] for i in range(data_len)]).float()
+                tgt_data = torch.tensor([daily_numpy[i+input_days:i+input_days+output_days] for i in range(data_len)]).float()
+                print(src_data.shape,tgt_data.shape)
+                #return 0
                 d_model = 64
                 nhead = 4
                 num_layers = 6
                 dropout = 0.1
+                feature=3
                 class StockTransformer(nn.Module):
                     def __init__(self,d_model,nhead,num_layers,dropout):
                         super(StockTransformer,self).__init__()
-                        self.input_linear = nn.Linear(1,d_model)
+                        self.input_linear = nn.Linear(feature,d_model)
                         self.transformer = nn.Transformer(d_model,nhead,num_layers,dropout=dropout)
                         self.output_linear = nn.Linear(d_model,1)
                     def forward(self,src,tgt):
@@ -53,7 +55,7 @@ class AK_TORCH(AkshareBase):
                         output = self.output_linear(output)
                         return output
                 model = StockTransformer(d_model,nhead,num_layers,dropout)
-                epochs = 100
+                epochs = 10
                 lr = 0.001
                 batch_size = 16
 
@@ -63,7 +65,7 @@ class AK_TORCH(AkshareBase):
                     for i in range(0,data_len,batch_size):
                         src_batch = src_data[i:i+batch_size].transpose(0,1)
                         tgt_batch = tgt_data[i:i+batch_size].transpose(0,1)
-                        print(epoch,src_batch.size(),tgt_batch.size(),tgt_batch[:-1].shape,tgt_batch[1:].shape)
+                        #print(epoch,src_batch.size(),tgt_batch.size(),tgt_batch[:-1].shape,tgt_batch[1:].shape)
                         optimizer.zero_grad()
                         output = model(src_batch,tgt_batch[:-1])
                         loss = criterion(output,tgt_batch[1:])
@@ -71,8 +73,9 @@ class AK_TORCH(AkshareBase):
                         optimizer.step()
                     print(f"Epoch {epoch+1}/{epochs},Loss: {loss.item()}")
                 
-                src = torch.tensor(daily_numpy[-input_days:]).unsqueeze(-1).unsqueeze(1).float()
+                src = torch.tensor(daily_numpy[-input_days:]).unsqueeze(-1).float()
                 tgt = torch.zeros(output_days,1,1)
+                print(src.shape,tgt.shape)
                 with torch.no_grad():
                     for i in range(output_days):
                         pred = model(src,tgt[:i+1])
