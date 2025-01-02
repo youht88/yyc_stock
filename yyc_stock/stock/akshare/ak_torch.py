@@ -10,6 +10,8 @@ from tqdm import tqdm
 
 from .ak_base import AkshareBase
 import torch
+import torch.nn as nn
+import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 
 class AK_TORCH(AkshareBase):
@@ -18,8 +20,68 @@ class AK_TORCH(AkshareBase):
         self.register_router()
 
     def register_router(self):
-        @self.router.get("/torch")
-        async def test_torch(req:Request):
+        @self.router.get("/torch2")
+        async def test_torch2(req:Request):
+            '''测试torch2,根据前input_days天的数据预测后output_days的股价'''
+            try:
+                df = self._get_df_source("daily_pro.db","select * from daily where code='000001'")
+                daily = df[['c']]
+                daily.reset_index(drop=True,inplace=True)
+                input_days = 20
+                output_days = 3
+                daily_numpy = daily.values
+                data_len = len(daily_numpy) - input_days - output_days +1
+                src_data = torch.tensor([daily_numpy[i:i+input_days] for i in range(data_len)])
+                tgt_data = torch.tensor([daily_numpy[i+input_days:i+input_days+output_days] for i in range(data_len)])
+
+                d_model = 64
+                nhead = 4
+                num_layers = 6
+                dropout = 0.1
+                class StockTransformer(nn.Transformer):
+                    def __init__(self,d_model,nhead,num_layers,dropout):
+                        super(StockTransformer,self).__init__()
+                        self.input_linear = nn.Linear(1,d_model)
+                        self.transformer = nn.Transformer(d_model,nhead,num_layers,dropout=dropout)
+                        self.output_linear = nn.Linear(d_model,1)
+                    def forward(self,src,tgt):
+                        src = self.input_linear(src_data)
+                        tgt = self.input_linear(tgt_data)
+                        output = self.transformer(src,tgt)
+                        output = self.output_linear(output)
+                        return output
+                model = StockTransformer(d_model,nhead,num_layers,dropout)
+                epochs = 100
+                lr = 0.001
+                batch_size = 16
+
+                criterion = nn.MSELoss()
+                optimizer = optim.Adam(model.parameters(),lr=lr)
+                for epoch in range(epochs):
+                    for i in range(0,data_len,batch_size):
+                        src_batch = src_data[i:i+batch_size].transpose(0,1)
+                        tgt_batch = tgt_data[i:i+batch_size].transpose(0,1)
+                        optimizer.zero_grad()
+                        output = model(src_batch,tgt_batch[:-1])
+                        loss = criterion(output,tgt_batch[1:])
+                        loss.backward()
+                        optimizer.step()
+                    print(f"Epoch {epoch+1}/{epochs},Loss: {loss.item()}")
+                
+                src = torch.tensor(daily_numpy[-input_days:]).unsqueeze(-1).unsqueeze(1).float()
+                tgt = torch.zeros(output_days,1,1)
+                with torch.no_grad():
+                    for i in range(output_days):
+                        pred = model(src,tgt[:i+1])
+                        tgt[i] = pred[-1]
+                output = tgt.squeeze().to_list()
+                print("Next {} days of stock prices:",output)
+                return output
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+
+        @self.router.get("/torch1")
+        async def test_torch1(req:Request):
             """获取当前资金流数据"""
             try:
                 df = self._get_df_source("daily_pro.db","select * from daily where code='000001'")
