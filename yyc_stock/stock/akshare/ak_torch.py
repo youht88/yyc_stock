@@ -143,6 +143,7 @@ class AK_TORCH(AkshareBase):
                 optimizer = optim.Adam(model.parameters(), lr=0.001)
                 #8. 训练模型
                 num_epochs = 100
+                best_loss = float('inf')
                 for epoch in range(num_epochs):
                     model.train()
                     for batch_x, batch_y in train_loader:
@@ -156,29 +157,27 @@ class AK_TORCH(AkshareBase):
                         optimizer.step()
                     
                     if (epoch + 1) % 10 == 0:
-                        print(f'Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}')
-                #9. 验证模型
-                model.eval()
-                predictions = []
-                actuals = []
-
-                with torch.no_grad():
-                    for batch_x, batch_y in test_loader:
-                        tgt = torch.zeros(batch_x.size(0), seq_length, 1)
-                        tgt[:, :-1, :] = batch_x[:, :-1, :]
-                        output = model(batch_x.permute(1, 0, 2), tgt.permute(1, 0, 2))
-                        print(output)
-                        predictions.append(output.numpy())
-                        actuals.append(batch_y.numpy())
-                #10. 将预测和实际结果合并
-                predictions = torch.cat(predictions).numpy()
-                actuals = torch.cat(actuals).numpy()
-                #11. 反归一化
-                predictions = predictions * (max_val - min_val) + min_val
-                actuals = actuals * (max_val - min_val) + min_val
+                        print(f'Epoch [{epoch + 1}/{num_epochs}], Train Loss: {loss.item():.4f}')
+                    #9. 验证模型
+                    model.eval()
+                    total_loss = 0.0
+                    with torch.no_grad():
+                        for batch_x, batch_y in test_loader:
+                            tgt = torch.zeros(batch_x.size(0), seq_length, 1)
+                            tgt[:, :-1, :] = batch_x[:, :-1, :]
+                            output = model(batch_x.permute(1, 0, 2), tgt.permute(1, 0, 2))
+                            loss = criterion(output, batch_y)
+                            total_loss += loss.item()
+                    if (epoch + 1) % 10 == 0:
+                        print(f'Epoch [{epoch + 1}/{num_epochs}], Val Loss: {total_loss / len(test_loader)}')
+                    if total_loss < best_loss:
+                        best_loss = total_loss
+                        best_model = model
+                        torch.save(best_model.state_dict,"transformer.pth")
+                # #11. 反归一化
+                # predictions = predictions * (max_val - min_val) + min_val
+                # actuals = actuals * (max_val - min_val) + min_val
                 
-                print("predictions:",predictions)
-                print("actuals",actuals)
 
                 return "ok"
                 # df = self._prepare_df(df,req)
