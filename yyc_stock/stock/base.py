@@ -787,6 +787,7 @@ class StockBase:
         str_cols= df.select_dtypes(include=['object']).columns.to_list()
         df_state = df.describe()
         df_state.loc['sum']=df[df.select_dtypes(include=['int', 'float']).columns].sum()
+        df_state = df_state.T
         state_table = df_state.to_html(table_id='state_table')
         if formats:
             #example f=e_s:10000000,50000000;e_jlr:0,0;v_jlr:0,0
