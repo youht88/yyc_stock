@@ -212,6 +212,7 @@ class StockBase:
         self.bk_codes = {}
         self.akbkdm=None
         self.akbk_codes = {}
+        self.etf_codes = []
         self.mairui_token = Config.get('STOCK.MAIRUI.TOKEN')
         self.mairui_api_url = "http://api.mairui.club" 
         self.router = APIRouter()
@@ -247,7 +248,7 @@ class StockBase:
                             df = df.filter(columns)
                         df.to_sql(table_name,index=False,if_exists="append",con=sqlite3.connect(db_name))
                 return results
-    def _get_codes(self,type:Literal['stock','zx','bk','akbk'],name)->list[str]:
+    def _get_codes(self,type:Literal['stock','zx','bk','akbk','etf'],name)->list[str]:
         codes = []
         if type=='stock':
             codes_info = [self._get_stock_code(item) for item in name.split(',') if item]
@@ -261,15 +262,20 @@ class StockBase:
         elif type=='akbk':
             codes_info = self._get_akbk_codes(name)
             codes = [item['dm'] for item in codes_info]
+        elif type=='etf':
+            codes_info = self._get_etf_codes(name)
+            codes = [item['dm'] for item in codes_info]
+            print('etf===>',codes_info,codes)
         return codes        
     def _get_request_codes(self,req:Request)->list[str]:
         stock = req.query_params.get('code')
         zx = req.query_params.get('zx')
         bk = req.query_params.get('bk')
         akbk = req.query_params.get('akbk')
+        etf = req.query_params.get('etf')
         codes = []
-        if not stock and not zx and not bk and not akbk:
-            raise Exception('必须指定code、zx、bk、akbk参数中的一个')
+        if not stock and not zx and not bk and not akbk and not etf:
+            raise Exception('必须指定code、zx、bk、akbk、etf参数中的一个')
         if stock:
             codes = self._get_codes('stock',stock)
         elif zx:
@@ -278,7 +284,37 @@ class StockBase:
             codes = self._get_codes('bk',bk)
         elif akbk:
             codes = self._get_codes('akbk',akbk)
+        elif etf:
+            codes = self._get_codes('etf',etf)
         return codes
+    def _get_etf_codes(self,key:str)->list[dict]:
+        codes = [item for item in key.split(',') if item]
+        print(1,key,codes)
+        if not self.etf_codes:
+            try:
+                df = ak.fund_name_em()
+                df = df.filter(['基金代码','基金简称','基金类型'])
+                df = df.rename(columns={'基金代码':'dm','基金简称':'mc','基金类型':'type'})
+                self.etf_codes = df.to_dict(orient="records")
+                print(2,len(self.etf_codes))
+            except Exception as e:
+                print('????',e)
+                raise Exception(f'获取etf代码是出错!,{e}')
+        rtn_codes = []
+
+        for code in codes:
+            print("!!!!",code)
+            if code.isnumeric():    
+                find_codes = [item for item in self.etf_codes if item['dm']==code]
+                print(3,find_codes)
+            else:
+                find_codes = [item for item in self.etf_codes if code in item['mc']]
+                print(4,find_codes)
+            if find_codes:
+                rtn_codes = rtn_codes + find_codes
+        print(5,rtn_codes)
+        return rtn_codes
+
     def _get_zx_codes(self,key:str)->list[dict]:
         try:
             df = pd.read_sql(f"select * from zx where key='{key}'",self.sqlite)

@@ -24,6 +24,11 @@ class AkshareBase(StockBase):
         if codes:
             df = df[df['代码'].isin(codes)]
         return df
+    def current_etf(self,codes=None):
+        df = ak.fund_etf_spot_em()
+        if codes:
+            df = df[df['代码'].isin(codes)]
+        return df
     def index_info(self):
         df = ak.index_stock_info()
         return df

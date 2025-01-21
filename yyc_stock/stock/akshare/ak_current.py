@@ -110,7 +110,21 @@ class AK_CURRENT(AkshareBase):
                 return HTMLResponse(content=content)
             except Exception as e:
                 raise HTTPException(status_code=400, detail=f"{e}")
-
+        @self.router.get("/current_etf")
+        async def current_etf(req:Request):
+            """获取当前行情数据"""
+            try:
+                #df = self._get_df_source(db_name="price_30.db",sql=f"select * from price where code='{code}'")
+                #df = self._get_df_source(ak_func=ak.stock_intraday_em,columns={'时间':'t'})
+                #codes = self._get_request_codes(req)
+                codes=None
+                df = self.current_etf(codes)
+                df = self._prepare_df(df,req)
+                desc= req.query_params.get('desc')
+                content = self._to_html(df,formats=req.query_params.get('f'),fix_columns=['代码','名称','换手率'],url=req.url,desc=desc)
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")    
         @self.router.get("/current/price")
         async def _current_price(req:Request):
             """当前价格数据"""

@@ -51,6 +51,45 @@ class AK_HIST(AkshareBase):
         # return max_date
         return df
     def register_router(self):
+        @self.router.get("/hist/daily_etf")
+        async def _hist_daily_etf(req:Request):
+            """获取历史行情数据"""
+            try:
+                sdate = req.query_params.get('sdate')
+                if not sdate:
+                    sdate = '20230101'
+                codes = self._get_request_codes(req)
+                dfs = []    
+                for code in codes:
+                    print('????',code)
+                    dfs.append(ak.fund_etf_hist_em(code,start_date=sdate))
+                df = pd.concat(dfs,axis=0)
+                df = self._prepare_df(df,req)
+                formats = req.query_params.get('f')
+                if not formats:
+                    formats =  'zd:0,0;e:100000000,100000000'
+                desc= req.query_params.get('desc')
+                content = self._to_html(df,formats=formats,fix_columns=['code','mc'],url=req.url,desc=desc)
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
+        @self.router.get("/hist/minute_etf")
+        async def _hist_minute_etf(req:Request):
+            """获取历史行情数据"""
+            try:
+                sdate = req.query_params.get('sdate')
+                if not sdate:
+                    sdate = '2023-01-01 09:00:00'
+                df = ak.fund_etf_hist_min_em('513520',period=5)
+                df = self._prepare_df(df,req)
+                formats = req.query_params.get('f')
+                if not formats:
+                    formats =  'zd:0,0;e:100000000,100000000'
+                desc= req.query_params.get('desc')
+                content = self._to_html(df,formats=formats,fix_columns=['code','mc'],url=req.url,desc=desc)
+                return HTMLResponse(content=content)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"{e}")
         @self.router.get("/hist/daily_pro")
         async def _hist_daily_pro(req:Request):
             """获取历史行情数据"""
