@@ -58,12 +58,19 @@ class AK_HIST(AkshareBase):
                 sdate = req.query_params.get('sdate')
                 if not sdate:
                     sdate = '20230101'
+                else:
+                    sdate = sdate.replace('-','')
                 codes = self._get_request_codes(req)
                 dfs = []    
                 for code in codes:
-                    print('????',code)
-                    dfs.append(ak.fund_etf_hist_em(code,start_date=sdate))
+                    code_df = ak.fund_etf_hist_em(code,start_date=sdate)
+                    #code_df = pd.to_datetime(code_df['日期'])
+                    code_df['code'] = code
+                    code_df['mc'] = self.etf_codes[code]['mc']
+                    code_df = code_df.sort_values('日期',ascending=False)
+                    dfs.append(code_df)
                 df = pd.concat(dfs,axis=0)
+                df['日期'] = pd.to_datetime(df['日期'])
                 df = self._prepare_df(df,req)
                 formats = req.query_params.get('f')
                 if not formats:
@@ -80,7 +87,17 @@ class AK_HIST(AkshareBase):
                 sdate = req.query_params.get('sdate')
                 if not sdate:
                     sdate = '2023-01-01 09:00:00'
-                df = ak.fund_etf_hist_min_em('513520',period=5)
+                codes = self._get_request_codes(req)
+                dfs = []    
+                for code in codes:
+                    code_df = ak.fund_etf_hist_min_em(code,start_date=sdate,period=5)
+                    #code_df = pd.to_datetime(code_df['日期'])
+                    code_df['code'] = code
+                    code_df['mc'] = self.etf_codes[code]['mc']
+                    code_df = code_df.sort_values('时间',ascending=False)
+                    dfs.append(code_df)
+                df = pd.concat(dfs,axis=0)
+                df['时间'] = pd.to_datetime(df['时间'])
                 df = self._prepare_df(df,req)
                 formats = req.query_params.get('f')
                 if not formats:

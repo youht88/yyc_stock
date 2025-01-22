@@ -121,7 +121,9 @@ def gen_content_html(data_table,state_table,fix_col_index:list[int]=[],url=None,
                             value=""
                             text = text.replace('Copy','').replace('\\n','')                     
                         }}else{{
-                            value = parseFloat(text.replace(/,/g, '').replace(/E[+-]?\\d+/, 'e$&'));
+                            if (!/^\\d{{4}}-\\d{{2}}-\\d{{2}}/.test(text)){{
+                                value = parseFloat(text.replace(/,/g, '').replace(/E[+-]?\\d+/, 'e$&'));
+                            }}
                         }}
                         if (value){{
                             rowData.push(value);
@@ -212,7 +214,7 @@ class StockBase:
         self.bk_codes = {}
         self.akbkdm=None
         self.akbk_codes = {}
-        self.etf_codes = []
+        self.etf_codes = {}
         self.mairui_token = Config.get('STOCK.MAIRUI.TOKEN')
         self.mairui_api_url = "http://api.mairui.club" 
         self.router = APIRouter()
@@ -265,7 +267,6 @@ class StockBase:
         elif type=='etf':
             codes_info = self._get_etf_codes(name)
             codes = [item['dm'] for item in codes_info]
-            print('etf===>',codes_info,codes)
         return codes        
     def _get_request_codes(self,req:Request)->list[str]:
         stock = req.query_params.get('code')
@@ -288,31 +289,29 @@ class StockBase:
             codes = self._get_codes('etf',etf)
         return codes
     def _get_etf_codes(self,key:str)->list[dict]:
-        codes = [item for item in key.split(',') if item]
-        print(1,key,codes)
+        codes = [item.strip() for item in key.split(',') if item]
         if not self.etf_codes:
             try:
-                df = ak.fund_name_em()
-                df = df.filter(['基金代码','基金简称','基金类型'])
-                df = df.rename(columns={'基金代码':'dm','基金简称':'mc','基金类型':'type'})
-                self.etf_codes = df.to_dict(orient="records")
-                print(2,len(self.etf_codes))
-            except Exception as e:
-                print('????',e)
-                raise Exception(f'获取etf代码是出错!,{e}')
+                df = pd.read_sql("select * from etf_codes",self.sqlite)
+                self.etf_codes = {item['dm']:item for item in df.to_dict(orient="records")}
+            except:
+                try:
+                    df = ak.fund_name_em()
+                    df = df.filter(['基金代码','基金简称','基金类型'])
+                    df = df.rename(columns={'基金代码':'dm','基金简称':'mc','基金类型':'type'})
+                    df.to_sql("etf_codes",if_exists='replace',con=self.sqlite)
+                    self.etf_codes = {item['dm']:item for item in df.to_dict(orient="records")}
+                except Exception as e:
+                    raise Exception(f'获取etf代码是出错!,{e}')
         rtn_codes = []
 
         for code in codes:
-            print("!!!!",code)
             if code.isnumeric():    
-                find_codes = [item for item in self.etf_codes if item['dm']==code]
-                print(3,find_codes)
+                find_codes = [item for item in self.etf_codes.values() if item['dm']==code]
             else:
-                find_codes = [item for item in self.etf_codes if code in item['mc']]
-                print(4,find_codes)
+                find_codes = [item for item in self.etf_codes.values() if code in item['mc']]
             if find_codes:
                 rtn_codes = rtn_codes + find_codes
-        print(5,rtn_codes)
         return rtn_codes
 
     def _get_zx_codes(self,key:str)->list[dict]:
