@@ -266,6 +266,7 @@ class StockBase:
             codes = [item['dm'] for item in codes_info]
         elif type=='etf':
             codes_info = self._get_etf_codes(name)
+            print("====>",codes_info)
             codes = [item['dm'] for item in codes_info]
         return codes        
     def _get_request_codes(self,req:Request)->list[str]:

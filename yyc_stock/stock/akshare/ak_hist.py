@@ -67,10 +67,10 @@ class AK_HIST(AkshareBase):
                     #code_df = pd.to_datetime(code_df['日期'])
                     code_df['code'] = code
                     code_df['mc'] = self.etf_codes[code]['mc']
-                    code_df = code_df.sort_values('日期',ascending=False)
                     dfs.append(code_df)
                 df = pd.concat(dfs,axis=0)
                 df['日期'] = pd.to_datetime(df['日期'])
+                df = df.sort_values('日期',ascending=False)
                 df = self._prepare_df(df,req)
                 formats = req.query_params.get('f')
                 if not formats:
@@ -94,10 +94,10 @@ class AK_HIST(AkshareBase):
                     #code_df = pd.to_datetime(code_df['日期'])
                     code_df['code'] = code
                     code_df['mc'] = self.etf_codes[code]['mc']
-                    code_df = code_df.sort_values('时间',ascending=False)
                     dfs.append(code_df)
                 df = pd.concat(dfs,axis=0)
                 df['时间'] = pd.to_datetime(df['时间'])
+                df = df.sort_values('时间',ascending=False)
                 df = self._prepare_df(df,req)
                 formats = req.query_params.get('f')
                 if not formats:
